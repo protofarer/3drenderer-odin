@@ -6,6 +6,9 @@ import sdl "vendor:sdl3"
 
 pr :: fmt.println
 
+FPS :: 60
+FRAME_TARGET_TIME :: 1000 / FPS
+
 App_State :: struct {
 	window: ^sdl.Window,
 	renderer: ^sdl.Renderer,
@@ -14,15 +17,15 @@ App_State :: struct {
     color_buffer_texture: ^sdl.Texture,
     window_w: i32,
     window_h: i32,
+    previous_frame_time: u64,
 }
 app: ^App_State
 
-N_POINTS :: 9*9*9
 camera_position: Vec3 = {0, 0, -5}
 fov_factor: f32 = 640
 
-cube_points: [N_POINTS]Vec3
-projected_points: [N_POINTS]Vec2
+// no. of vertices projected
+triangles_to_render: [dynamic]Triangle
 
 main :: proc() {
     context.logger = log.create_console_logger()
@@ -37,6 +40,7 @@ main :: proc() {
         process_input()
         update()
         render()
+        clear(&triangles_to_render)
     }
     shutdown()
 }
@@ -88,31 +92,57 @@ process_input :: proc() {
 
 cube_rotation: Vec3
 update :: proc() {
+    next_frame_time := app.previous_frame_time + FRAME_TARGET_TIME
+    time_to_wait := next_frame_time - sdl.GetTicks()
+    if time_to_wait > 0 && time_to_wait <= FRAME_TARGET_TIME {
+        sdl.Delay(u32(time_to_wait))
+        // Wait
+    }
+    app.previous_frame_time = sdl.GetTicks()
+
     cube_rotation.x += 0.05
     cube_rotation.y += 0.05
     cube_rotation.z += 0.05
-    for p, i in cube_points {
-        point := p
 
-        transformed_point := vec3_rotate_y(point, cube_rotation.y)
-        transformed_point = vec3_rotate_x(transformed_point, cube_rotation.x)
-        transformed_point = vec3_rotate_z(transformed_point, cube_rotation.z)
+    for face, i in cube_mesh_faces {
+        face_vertices: [3]Vec3
+        face_vertices[0] = cube_mesh_vertices[face.a - 1]
+        face_vertices[1] = cube_mesh_vertices[face.b - 1]
+        face_vertices[2] = cube_mesh_vertices[face.c - 1]
 
-        transformed_point.z -= camera_position.z
-        projected_point := project(transformed_point)
-        projected_points[i] = projected_point
+        projected_triangle: Triangle
+        for vertex, i in face_vertices {
+            transformed_vertex := vec3_rotate_y(vertex, cube_rotation.y)
+            transformed_vertex = vec3_rotate_x(transformed_vertex, cube_rotation.x)
+            transformed_vertex = vec3_rotate_z(transformed_vertex, cube_rotation.z)
+
+            // Translate away from camera
+            transformed_vertex.z -= camera_position.z
+
+            // Project
+            projected_vertex := project(transformed_vertex)
+
+            // Scale and translate to middle of screen
+            projected_vertex.x += f32(app.window_w) / 2
+            projected_vertex.y += f32(app.window_h) / 2
+
+            projected_triangle[i] = projected_vertex
+        }
+        append(&triangles_to_render, projected_triangle)
     }
 }
 
 render :: proc() {
     draw_grid()
 
-    for p in projected_points {
-        draw_rect_filled(
-            p.x + (f32(app.window_w) / 2), 
-            p.y + (f32(app.window_h)/2), 
-            4, 4, 0xFFFF0000
-        )
+    for triangle in triangles_to_render {
+        for point in triangle {
+            draw_rect_filled(
+                point.x, 
+                point.y, 
+                3, 3, 0xFFFF0000
+            )
+        }
     }
 
     render_color_buffer()
@@ -139,17 +169,6 @@ setup :: proc() {
         app.window_w,
         app.window_h,
     )
-
-    point_count: int
-    for x:f32 = -1; x <= 1; x += 0.25 {
-        for y:f32 = -1; y <= 1; y += 0.25 {
-            for z:f32 = -1; z <= 1; z += 0.25 {
-                new_point := Vec3{x, y, z}
-                cube_points[point_count] = new_point
-                point_count += 1
-            }
-        }
-    }
 }
 
 clear_color_buffer :: proc(color: u32) {
