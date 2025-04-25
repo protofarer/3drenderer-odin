@@ -31,3 +31,12 @@ cube_mesh_faces := [?]Face{
     {6,8,1},
     {6,1,4},
 }
+
+load_cube_mesh_data :: proc() {
+    for face in cube_mesh_faces {
+        append(&g_mesh.faces, face)
+    }
+    for vertex in cube_mesh_vertices {
+        append(&g_mesh.vertices, vertex)
+    }
+}

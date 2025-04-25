@@ -1,5 +1,9 @@
 package main
 
+import "core:math"
+
+DEFAULT_COLOR :: 0xFFFFFFFF
+
 draw_grid :: proc() {
     d :: 20
     for y in 0..<app.window_h/d {
@@ -15,7 +19,7 @@ draw_rect_filled :: proc {
     draw_rect_filled_i32,
 }
 
-draw_rect_filled_i32 :: proc(x: i32, y: i32, w: i32, h:i32, color: u32) {
+draw_rect_filled_i32 :: proc(x: i32, y: i32, w: i32, h:i32, color: u32 = DEFAULT_COLOR) {
     for y_i in y..<y+h {
         for x_i in x..<x+w {
             draw_pixel(x_i, y_i, color)
@@ -23,7 +27,7 @@ draw_rect_filled_i32 :: proc(x: i32, y: i32, w: i32, h:i32, color: u32) {
     }
 }
 
-draw_rect_filled_f32 :: proc(x: f32, y: f32, w: f32, h:f32, color: u32) {
+draw_rect_filled_f32 :: proc(x: f32, y: f32, w: f32, h:f32, color: u32 = DEFAULT_COLOR) {
     for y_i in i32(y)..<i32(y+h) {
         for x_i in i32(x)..<i32(x+w) {
             draw_pixel(x_i, y_i, color)
@@ -32,18 +36,79 @@ draw_rect_filled_f32 :: proc(x: f32, y: f32, w: f32, h:f32, color: u32) {
 }
 
 draw_pixel :: proc {
-    draw_pixel2,
-    draw_pixel3,
+    draw_pixel_i32,
+    draw_pixel_f32,
 }
 
-draw_pixel2 :: proc(x: i32, y: i32, color: u32) {
+draw_pixel_i32 :: proc(x: i32, y: i32, color: u32 = DEFAULT_COLOR) {
     condition := x >= 0 && x < app.window_w && y >= 0 && y < app.window_h
     assert(condition, "Pixel must be within window bounds")
     app.color_buffer[(app.window_w * y) + x] = color
 }
 
-draw_pixel3 :: proc(x: f32, y: f32, color: u32) {
+draw_pixel_f32 :: proc(x: f32, y: f32, color: u32 = DEFAULT_COLOR) {
     condition := x >= 0 && x < f32(app.window_w) && y >= 0 && y < f32(app.window_h)
     assert(condition, "Pixel must be within window bounds")
     app.color_buffer[(app.window_w * i32(y)) + i32(x)] = color
+}
+
+draw_line :: proc {
+    draw_line_i32,
+    draw_line_f32,
+}
+
+draw_line_i32 :: proc(x0, y0, x1, y1: i32, color: u32 = DEFAULT_COLOR) {
+    dx := x1 - x0
+    dy := y1 - y0
+
+    sx := abs(dx)
+    sy := abs(dy)
+    side_length := sx >= sy ? sx : sy
+
+    inc_x := f32(dx) / f32(side_length)
+    inc_y := f32(dy) / f32(side_length)
+
+    curr_x : f32 = f32(x0)
+    curr_y : f32 = f32(y0)
+
+    for i in 0..<side_length {
+        draw_pixel(
+            math.round(curr_x), 
+            math.round(curr_y),
+            color,
+        )
+        curr_x += inc_x
+        curr_y += inc_y
+    }
+}
+
+draw_line_f32 :: proc(x0, y0, x1, y1: f32, color: u32 = DEFAULT_COLOR) {
+    dx := x1 - x0
+    dy := y1 - y0
+
+    sx := abs(dx)
+    sy := abs(dy)
+    side_length := sx >= sy ? sx : sy
+
+    inc_x := dx / side_length
+    inc_y := dy / side_length
+
+    curr_x := x0
+    curr_y := y0
+
+    for i in 0..<side_length {
+        draw_pixel(
+            math.round(curr_x), 
+            math.round(curr_y),
+            color,
+        )
+        curr_x += inc_x
+        curr_y += inc_y
+    }
+}
+
+draw_triangle :: proc(triangle: Triangle, color: u32 = DEFAULT_COLOR) {
+    draw_line(triangle[0].x,triangle[0].y,triangle[1].x,triangle[1].y, color)
+    draw_line(triangle[1].x,triangle[1].y,triangle[2].x,triangle[2].y, color)
+    draw_line(triangle[2].x,triangle[2].y,triangle[0].x,triangle[0].y, color)
 }

@@ -22,10 +22,12 @@ App_State :: struct {
 app: ^App_State
 
 camera_position: Vec3 = {0, 0, -5}
-fov_factor: f32 = 640
+g_fov_factor: f32 = 640
 
 // no. of vertices projected
-triangles_to_render: [dynamic]Triangle
+g_triangles_to_render: [dynamic]Triangle
+
+g_mesh: Mesh
 
 main :: proc() {
     context.logger = log.create_console_logger()
@@ -40,7 +42,7 @@ main :: proc() {
         process_input()
         update()
         render()
-        clear(&triangles_to_render)
+        clear(&g_triangles_to_render)
     }
     shutdown()
 }
@@ -90,7 +92,6 @@ process_input :: proc() {
     }
 }
 
-cube_rotation: Vec3
 update :: proc() {
     next_frame_time := app.previous_frame_time + FRAME_TARGET_TIME
     time_to_wait := next_frame_time - sdl.GetTicks()
@@ -100,21 +101,22 @@ update :: proc() {
     }
     app.previous_frame_time = sdl.GetTicks()
 
-    cube_rotation.x += 0.05
-    cube_rotation.y += 0.05
-    cube_rotation.z += 0.05
+    g_mesh.rotation.x += 0.05
+    g_mesh.rotation.y += 0.05
+    g_mesh.rotation.z += 0.05
 
-    for face, i in cube_mesh_faces {
+    for face, i in g_mesh.faces {
         face_vertices: [3]Vec3
-        face_vertices[0] = cube_mesh_vertices[face.a - 1]
-        face_vertices[1] = cube_mesh_vertices[face.b - 1]
-        face_vertices[2] = cube_mesh_vertices[face.c - 1]
+        face_vertices[0] = g_mesh.vertices[face.a - 1]
+        face_vertices[1] = g_mesh.vertices[face.b - 1]
+        face_vertices[2] = g_mesh.vertices[face.c - 1]
 
         projected_triangle: Triangle
+
         for vertex, i in face_vertices {
-            transformed_vertex := vec3_rotate_y(vertex, cube_rotation.y)
-            transformed_vertex = vec3_rotate_x(transformed_vertex, cube_rotation.x)
-            transformed_vertex = vec3_rotate_z(transformed_vertex, cube_rotation.z)
+            transformed_vertex := vec3_rotate_y(vertex, g_mesh.rotation.y)
+            transformed_vertex = vec3_rotate_x(transformed_vertex, g_mesh.rotation.x)
+            transformed_vertex = vec3_rotate_z(transformed_vertex, g_mesh.rotation.z)
 
             // Translate away from camera
             transformed_vertex.z -= camera_position.z
@@ -128,14 +130,15 @@ update :: proc() {
 
             projected_triangle[i] = projected_vertex
         }
-        append(&triangles_to_render, projected_triangle)
+        append(&g_triangles_to_render, projected_triangle)
     }
 }
 
 render :: proc() {
     draw_grid()
 
-    for triangle in triangles_to_render {
+    for triangle in g_triangles_to_render {
+        // draw vertices
         for point in triangle {
             draw_rect_filled(
                 point.x, 
@@ -143,6 +146,8 @@ render :: proc() {
                 3, 3, 0xFFFF0000
             )
         }
+        // draw edges
+        draw_triangle(triangle)
     }
 
     render_color_buffer()
@@ -169,6 +174,8 @@ setup :: proc() {
         app.window_w,
         app.window_h,
     )
+    g_mesh = Mesh{}
+    load_cube_mesh_data()
 }
 
 clear_color_buffer :: proc(color: u32) {
@@ -186,7 +193,7 @@ render_color_buffer :: proc() {
 
 project :: proc(point: Vec3) -> Vec2 {
     return Vec2{
-        (point.x * fov_factor) / point.z, 
-        (point.y * fov_factor) / point.z,
+        (point.x * g_fov_factor) / point.z, 
+        (point.y * g_fov_factor) / point.z,
     }
 }
