@@ -102,14 +102,14 @@ update :: proc() {
     app.previous_frame_time = sdl.GetTicks()
 
     g_mesh.rotation.x += 0.05
-    g_mesh.rotation.y += 0.05
-    g_mesh.rotation.z += 0.05
+    // g_mesh.rotation.y += 0.05
+    // g_mesh.rotation.z += 0.05
 
     for face, i in g_mesh.faces {
         face_vertices: [3]Vec3
-        face_vertices[0] = g_mesh.vertices[face.a - 1]
-        face_vertices[1] = g_mesh.vertices[face.b - 1]
-        face_vertices[2] = g_mesh.vertices[face.c - 1]
+        face_vertices[0] = g_mesh.vertices[face[0] - 1]
+        face_vertices[1] = g_mesh.vertices[face[1] - 1]
+        face_vertices[2] = g_mesh.vertices[face[2] - 1]
 
         projected_triangle: Triangle
 
@@ -160,6 +160,9 @@ shutdown :: proc() {
     sdl.DestroyRenderer(app.renderer)
     sdl.DestroyWindow(app.window)
     sdl.Quit()
+    delete(g_mesh.faces)
+    delete(g_mesh.vertices)
+    delete(g_triangles_to_render)
     return
 }
 
@@ -176,6 +179,9 @@ setup :: proc() {
     )
     g_mesh = Mesh{}
     load_cube_mesh_data()
+    load_obj_file_data("./assets/f22.obj")
+    // pr(g_mesh.faces)
+    // pr(g_mesh.vertices)
 }
 
 clear_color_buffer :: proc(color: u32) {

@@ -1,11 +1,7 @@
 package main
 
 // Vertex indices, order matters
-Face :: struct {
-    a: int, 
-    b: int, 
-    c: int,
-}
+Face :: distinct [3]int
 
 // Points of triangle in screen space
-Triangle :: [3]Vec2
+Triangle :: distinct [3]Vec2
