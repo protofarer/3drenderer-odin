@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:log"
 import sdl "vendor:sdl3"
 import "core:math/linalg"
+import "core:sort"
 
 pr :: fmt.println
 
@@ -53,6 +54,7 @@ main :: proc() {
         process_input()
         update()
         render()
+        free_all(context.temp_allocator)
     }
     shutdown()
 }
@@ -124,9 +126,9 @@ update :: proc() {
 
     g_mesh.rotation.x += 0.05
     // g_mesh.rotation.y += 0.05
-    g_mesh.rotation.z += 0.05
+    g_mesh.rotation.z += 0.01
 
-    clear(&g_triangles_to_render)
+    g_triangles_to_render = make([dynamic]Triangle, context.temp_allocator)
     for face, i in g_mesh.faces {
         face_vertices: [3]Vec3
         face_vertices[0] = g_mesh.vertices[face.indices[0] - 1]
@@ -180,13 +182,35 @@ update :: proc() {
 
             projected_vertices[i] = projected_vertex
         }
+
+        // Calc avg depth for each face based on transformed vertices
+        avg_depth: f32
+        for v in transformed_vertices {
+            avg_depth += v.z
+        }
+        avg_depth /= 3
+
         projected_triangle := Triangle{
             points = projected_vertices,
             color = face.color,
+            avg_depth = avg_depth,
         }
         append(&g_triangles_to_render, projected_triangle)
     }
+    // Sort triangles to render by avg_depth
+
+    sort_triangles_by_depth(g_triangles_to_render[:])
 }
+
+
+sort_triangles_by_depth :: proc(g_triangles_to_render: []Triangle) {
+    sort.quick_sort_proc(g_triangles_to_render, compare_triangle_depth_desc)
+}
+
+compare_triangle_depth_desc :: proc(a: Triangle, b: Triangle) -> int {
+    return sort.compare_f32s(b.avg_depth, a.avg_depth)
+}
+
 
 render :: proc() {
     draw_grid()
@@ -235,6 +259,7 @@ setup :: proc() {
         app.window_h,
     )
     g_mesh = Mesh{}
+    g_cull_method = .Backface
     load_cube_mesh_data()
     // load_obj_file_data("./assets/cube.obj")
     // load_obj_file_data("./assets/f22.obj")
