@@ -119,13 +119,12 @@ update :: proc() {
     time_to_wait := next_frame_time - sdl.GetTicks()
     if time_to_wait > 0 && time_to_wait <= FRAME_TARGET_TIME {
         sdl.Delay(u32(time_to_wait))
-        // Wait
     }
     g_previous_frame_time = sdl.GetTicks()
 
     g_mesh.rotation.x += 0.05
     // g_mesh.rotation.y += 0.05
-    // g_mesh.rotation.z += 0.05
+    g_mesh.rotation.z += 0.05
 
     clear(&g_triangles_to_render)
     for face, i in g_mesh.faces {
@@ -191,17 +190,12 @@ update :: proc() {
 
 render :: proc() {
     draw_grid()
-
     for triangle in g_triangles_to_render {
-
-        // draw vertices
         if g_render_mode == .Wireframe_And_Vertices {
             for point in triangle.points {
                 draw_rect_filled(point.x - 3, point.y - 3, 6, 6, 0xFFFF0000)
             }
         }
-
-        // draw edges
         if g_render_mode == .Wireframe_And_Vertices || g_render_mode == .Wireframe || g_render_mode == .Filled_Triangles_And_Wireframe {
             draw_triangle(
                 triangle.points[0].x, triangle.points[0].y,
@@ -210,15 +204,12 @@ render :: proc() {
                 0xFF00FF00
             )
         }
-
         if g_render_mode == .Filled_Triangles || g_render_mode == .Filled_Triangles_And_Wireframe {
             draw_filled_triangle(triangle)
         }
     }
-
     render_color_buffer()
     clear_color_buffer(0xFF000000)
-
     sdl.RenderPresent(app.renderer)
 }
 
@@ -247,8 +238,6 @@ setup :: proc() {
     load_cube_mesh_data()
     // load_obj_file_data("./assets/cube.obj")
     // load_obj_file_data("./assets/f22.obj")
-    // pr(g_mesh.faces)
-    // pr(g_mesh.vertices)
 }
 
 clear_color_buffer :: proc(color: u32) {
