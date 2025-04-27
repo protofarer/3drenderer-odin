@@ -10,7 +10,6 @@ pr :: fmt.println
 FPS :: 60
 FRAME_TARGET_TIME :: 1000 / FPS
 
-
 App_State :: struct {
 	window: ^sdl.Window,
 	renderer: ^sdl.Renderer,
@@ -35,7 +34,7 @@ Cull_Method :: enum {
 g_color_buffer: []u32
 g_color_buffer_texture: ^sdl.Texture
 g_previous_frame_time: u64
-camera_position: Vec3 = {0, 0, 0}
+g_camera_position: Vec3 = {0, 0, 0}
 g_fov_factor: f32 = 640
 g_triangles_to_render: [dynamic]Triangle
 g_mesh: Mesh
@@ -46,16 +45,14 @@ main :: proc() {
     context.logger = log.create_console_logger()
     app = new(App_State)
     if app.is_running = initialize_window(); !app.is_running {
-        log.errorf("Error initializing window. Exiting.")
+        log.errorf("Error initializing window: %v", sdl.GetError())
         return
     }
     setup()
-
     for app.is_running {
         process_input()
         update()
         render()
-        clear(&g_triangles_to_render)
     }
     shutdown()
 }
@@ -130,6 +127,7 @@ update :: proc() {
     // g_mesh.rotation.y += 0.05
     // g_mesh.rotation.z += 0.05
 
+    clear(&g_triangles_to_render)
     for face, i in g_mesh.faces {
         face_vertices: [3]Vec3
         face_vertices[0] = g_mesh.vertices[face.indices[0] - 1]
@@ -162,7 +160,7 @@ update :: proc() {
             normalize(&normal)
 
             // form camera ray with A, points towards camera
-            camera_ray := camera_position - vertex_a
+            camera_ray := g_camera_position - vertex_a
 
             dot_normal_camera := linalg.dot(normal, camera_ray)
 

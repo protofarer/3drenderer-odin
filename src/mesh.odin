@@ -16,7 +16,6 @@ Mesh :: struct {
 
 // Handles triangles only
 load_obj_file_data :: proc(filename: string) {
-    pr("IN load obj file")
     raw_data, read_ok := os.read_entire_file_from_filename(filename)
     if !read_ok {
         log.error("Error reading file:", filename)
