@@ -3,31 +3,44 @@ package main
 import "core:fmt"
 import "core:log"
 import sdl "vendor:sdl3"
+import "core:math/linalg"
 
 pr :: fmt.println
 
 FPS :: 60
 FRAME_TARGET_TIME :: 1000 / FPS
 
+
 App_State :: struct {
 	window: ^sdl.Window,
 	renderer: ^sdl.Renderer,
     is_running:  bool,
-    color_buffer: []u32, // CSDR ptr or sep struct "buffer(s)"
-    color_buffer_texture: ^sdl.Texture,
     window_w: i32,
     window_h: i32,
-    previous_frame_time: u64,
 }
 app: ^App_State
 
-camera_position: Vec3 = {0, 0, -5}
+Render_Mode :: enum {
+    Wireframe_And_Vertices,
+    Wireframe,
+    Filled_Triangles,
+    Filled_Triangles_And_Wireframe,
+}
+
+Cull_Method :: enum {
+    None,
+    Backface,
+}
+
+g_color_buffer: []u32
+g_color_buffer_texture: ^sdl.Texture
+g_previous_frame_time: u64
+camera_position: Vec3 = {0, 0, 0}
 g_fov_factor: f32 = 640
-
-// no. of vertices projected
 g_triangles_to_render: [dynamic]Triangle
-
 g_mesh: Mesh
+g_render_mode: Render_Mode
+g_cull_method: Cull_Method
 
 main :: proc() {
     context.logger = log.create_console_logger()
@@ -87,19 +100,31 @@ process_input :: proc() {
             switch e.key.key {
             case sdl.K_ESCAPE:
                 app.is_running = false
+            case sdl.K_1:
+                g_render_mode = .Wireframe_And_Vertices
+            case sdl.K_2:
+                g_render_mode = .Wireframe
+            case sdl.K_3:
+                g_render_mode = .Filled_Triangles
+            case sdl.K_4:
+                g_render_mode = .Filled_Triangles_And_Wireframe
+            case sdl.K_C:
+                g_cull_method = .Backface
+            case sdl.K_D:
+                g_cull_method = .None
             }
         }
     }
 }
 
 update :: proc() {
-    next_frame_time := app.previous_frame_time + FRAME_TARGET_TIME
+    next_frame_time := g_previous_frame_time + FRAME_TARGET_TIME
     time_to_wait := next_frame_time - sdl.GetTicks()
     if time_to_wait > 0 && time_to_wait <= FRAME_TARGET_TIME {
         sdl.Delay(u32(time_to_wait))
         // Wait
     }
-    app.previous_frame_time = sdl.GetTicks()
+    g_previous_frame_time = sdl.GetTicks()
 
     g_mesh.rotation.x += 0.05
     // g_mesh.rotation.y += 0.05
@@ -107,28 +132,60 @@ update :: proc() {
 
     for face, i in g_mesh.faces {
         face_vertices: [3]Vec3
-        face_vertices[0] = g_mesh.vertices[face[0] - 1]
-        face_vertices[1] = g_mesh.vertices[face[1] - 1]
-        face_vertices[2] = g_mesh.vertices[face[2] - 1]
+        face_vertices[0] = g_mesh.vertices[face.indices[0] - 1]
+        face_vertices[1] = g_mesh.vertices[face.indices[1] - 1]
+        face_vertices[2] = g_mesh.vertices[face.indices[2] - 1]
 
-        projected_triangle: Triangle
-
+        // Transformations
+        transformed_vertices: [3]Vec3
         for vertex, i in face_vertices {
             transformed_vertex := vec3_rotate_y(vertex, g_mesh.rotation.y)
             transformed_vertex = vec3_rotate_x(transformed_vertex, g_mesh.rotation.x)
             transformed_vertex = vec3_rotate_z(transformed_vertex, g_mesh.rotation.z)
 
-            // Translate away from camera
-            transformed_vertex.z -= camera_position.z
+            // Translate away from camera, WARN hardcoded
+            transformed_vertex.z += 5
+            transformed_vertices[i] = transformed_vertex
+        }
 
-            // Project
+        // Backface Culling
+        if g_cull_method == .Backface {
+            vertex_a := transformed_vertices[0]
+            vertex_b := transformed_vertices[1]
+            vertex_c := transformed_vertices[2]
+            vector_ab := vertex_b - vertex_a
+            vector_ac := vertex_c - vertex_a
+            normalize(&vector_ab) // WARN extra instructions, possibly rm if not used later
+            normalize(&vector_ac) // WARN extra instructions, possibly rm if not used later
+
+            normal := linalg.cross(vector_ab, vector_ac) // coordinate handedness dependent
+            normalize(&normal)
+
+            // form camera ray with A, points towards camera
+            camera_ray := camera_position - vertex_a
+
+            dot_normal_camera := linalg.dot(normal, camera_ray)
+
+            // cull if negative (pointing away)
+            if dot_normal_camera < 0 {
+                continue
+            }
+        }
+
+        // Projections
+        projected_vertices: [3]Vec2
+        for transformed_vertex, i in transformed_vertices {
             projected_vertex := project(transformed_vertex)
 
             // Scale and translate to middle of screen
             projected_vertex.x += f32(app.window_w) / 2
             projected_vertex.y += f32(app.window_h) / 2
 
-            projected_triangle[i] = projected_vertex
+            projected_vertices[i] = projected_vertex
+        }
+        projected_triangle := Triangle{
+            points = projected_vertices,
+            color = face.color,
         }
         append(&g_triangles_to_render, projected_triangle)
     }
@@ -138,16 +195,27 @@ render :: proc() {
     draw_grid()
 
     for triangle in g_triangles_to_render {
+
         // draw vertices
-        for point in triangle {
-            draw_rect_filled(
-                point.x, 
-                point.y, 
-                3, 3, 0xFFFF0000
+        if g_render_mode == .Wireframe_And_Vertices {
+            for point in triangle.points {
+                draw_rect_filled(point.x - 3, point.y - 3, 6, 6, 0xFFFF0000)
+            }
+        }
+
+        // draw edges
+        if g_render_mode == .Wireframe_And_Vertices || g_render_mode == .Wireframe || g_render_mode == .Filled_Triangles_And_Wireframe {
+            draw_triangle(
+                triangle.points[0].x, triangle.points[0].y,
+                triangle.points[1].x, triangle.points[1].y,
+                triangle.points[2].x, triangle.points[2].y,
+                0xFF00FF00
             )
         }
-        // draw edges
-        draw_triangle(triangle)
+
+        if g_render_mode == .Filled_Triangles || g_render_mode == .Filled_Triangles_And_Wireframe {
+            draw_filled_triangle(triangle)
+        }
     }
 
     render_color_buffer()
@@ -169,8 +237,8 @@ shutdown :: proc() {
 setup :: proc() {
     // allocate and slice
     color_buffer := make([]u32, app.window_w * app.window_h)
-    app.color_buffer = color_buffer
-    app.color_buffer_texture = sdl.CreateTexture(
+    g_color_buffer = color_buffer
+    g_color_buffer_texture = sdl.CreateTexture(
         app.renderer, 
         sdl.PixelFormat.ARGB8888,
         sdl.TextureAccess.STREAMING,
@@ -179,7 +247,8 @@ setup :: proc() {
     )
     g_mesh = Mesh{}
     load_cube_mesh_data()
-    load_obj_file_data("./assets/f22.obj")
+    // load_obj_file_data("./assets/cube.obj")
+    // load_obj_file_data("./assets/f22.obj")
     // pr(g_mesh.faces)
     // pr(g_mesh.vertices)
 }
@@ -193,8 +262,8 @@ clear_color_buffer :: proc(color: u32) {
 }
 
 render_color_buffer :: proc() {
-    sdl.UpdateTexture(app.color_buffer_texture, nil, raw_data(app.color_buffer), app.window_w * 4)
-    sdl.RenderTexture(app.renderer, app.color_buffer_texture, nil, nil)
+    sdl.UpdateTexture(g_color_buffer_texture, nil, raw_data(g_color_buffer), app.window_w * 4)
+    sdl.RenderTexture(app.renderer, g_color_buffer_texture, nil, nil)
 }
 
 project :: proc(point: Vec3) -> Vec2 {

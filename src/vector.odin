@@ -11,6 +11,19 @@ vec2_new :: proc(x: f32, y: f32) -> Vec2 {
     return {x, y}
 }
 
+normalize :: proc {
+    normalize_vec2,
+    normalize_vec3,
+}
+
+normalize_vec2 :: proc(v: ^Vec2) {
+    v^ = linalg.normalize0(v^)
+}
+
+normalize_vec3 :: proc(v: ^Vec3) {
+    v^ = linalg.normalize0(v^)
+}
+
 vec3_new :: proc(x: f32, y: f32, z: f32) -> Vec3 {
     return {x, y, z}
 }

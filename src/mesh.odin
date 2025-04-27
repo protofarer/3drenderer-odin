@@ -14,6 +14,7 @@ Mesh :: struct {
     rotation: Vec3,
 }
 
+// Handles triangles only
 load_obj_file_data :: proc(filename: string) {
     pr("IN load obj file")
     raw_data, read_ok := os.read_entire_file_from_filename(filename)
@@ -46,7 +47,7 @@ load_obj_file_data :: proc(filename: string) {
             for group, i in splits[1:4] {
                 num_strings := strings.split(group, "/")
                 val := strconv.parse_int(num_strings[0]) or_else 0
-                face[i] = val
+                face.indices[i] = val
             }
             append(&faces, face)
         case:

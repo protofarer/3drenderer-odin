@@ -2,9 +2,8 @@ package main
 
 import "core:math/linalg"
 
-Mat4 :: linalg.Matrix4f32
-
 Mat3 :: linalg.Matrix3f32
+Mat4 :: linalg.Matrix4f32
 
 mat4_identity :: proc() -> Mat4 {
     return linalg.identity(Mat4)
