@@ -3,7 +3,6 @@ package main
 import "core:fmt"
 import "core:log"
 import sdl "vendor:sdl3"
-import "core:math/linalg"
 import "core:sort"
 
 pr :: fmt.println
@@ -124,9 +123,20 @@ update :: proc() {
     }
     g_previous_frame_time = sdl.GetTicks()
 
-    g_mesh.rotation.x += 0.05
+    // g_mesh.rotation.x += 0.05
     // g_mesh.rotation.y += 0.05
-    g_mesh.rotation.z += 0.01
+    // g_mesh.rotation.z += 0.05
+
+    // g_mesh.scale.x += 0.02
+    // g_mesh.scale.y += 0.02
+    g_mesh.translation.x += 0.1
+    // g_mesh.translation.z = 5
+
+    scale_matrix := mat4_make_scale(g_mesh.scale)
+    rotation_matrix_x := mat4_make_rotation_x(g_mesh.rotation.x)
+    rotation_matrix_y := mat4_make_rotation_y(g_mesh.rotation.y)
+    rotation_matrix_z := mat4_make_rotation_z(g_mesh.rotation.z)
+    translation_matrix := mat4_make_translation(g_mesh.translation)
 
     g_triangles_to_render = make([dynamic]Triangle, context.temp_allocator)
     for face, i in g_mesh.faces {
@@ -136,11 +146,19 @@ update :: proc() {
         face_vertices[2] = g_mesh.vertices[face.indices[2] - 1]
 
         // Transformations
-        transformed_vertices: [3]Vec3
+        transformed_vertices: [3]Vec4
         for vertex, i in face_vertices {
-            transformed_vertex := vec3_rotate_y(vertex, g_mesh.rotation.y)
-            transformed_vertex = vec3_rotate_x(transformed_vertex, g_mesh.rotation.x)
-            transformed_vertex = vec3_rotate_z(transformed_vertex, g_mesh.rotation.z)
+            transformed_vertex := vec4_from_vec3(vertex)
+
+            // TODO: move outside of loop
+            world_matrix := mat4_identity()
+            world_matrix = mat4_mul_mat4(scale_matrix, world_matrix)
+            world_matrix = mat4_mul_mat4(rotation_matrix_z, world_matrix)
+            world_matrix = mat4_mul_mat4(rotation_matrix_y, world_matrix)
+            world_matrix = mat4_mul_mat4(rotation_matrix_x, world_matrix)
+            world_matrix = mat4_mul_mat4(translation_matrix, world_matrix)
+
+            transformed_vertex = mat4_mul_vec4(world_matrix, transformed_vertex)
 
             // Translate away from camera, WARN hardcoded
             transformed_vertex.z += 5
@@ -149,21 +167,21 @@ update :: proc() {
 
         // Backface Culling
         if g_cull_method == .Backface {
-            vertex_a := transformed_vertices[0]
-            vertex_b := transformed_vertices[1]
-            vertex_c := transformed_vertices[2]
+            vertex_a := vec3_from_vec4(transformed_vertices[0])
+            vertex_b := vec3_from_vec4(transformed_vertices[1])
+            vertex_c := vec3_from_vec4(transformed_vertices[2])
             vector_ab := vertex_b - vertex_a
             vector_ac := vertex_c - vertex_a
             normalize(&vector_ab) // WARN extra instructions, possibly rm if not used later
             normalize(&vector_ac) // WARN extra instructions, possibly rm if not used later
 
-            normal := linalg.cross(vector_ab, vector_ac) // coordinate handedness dependent
+            normal := vec3_cross(vector_ab, vector_ac) // coordinate handedness dependent
             normalize(&normal)
 
             // form camera ray with A, points towards camera
             camera_ray := g_camera_position - vertex_a
 
-            dot_normal_camera := linalg.dot(normal, camera_ray)
+            dot_normal_camera := vec3_dot(normal, camera_ray)
 
             // cull if negative (pointing away)
             if dot_normal_camera < 0 {
@@ -172,15 +190,15 @@ update :: proc() {
         }
 
         // Projections
-        projected_vertices: [3]Vec2
+        projected_points: [3]Vec2
         for transformed_vertex, i in transformed_vertices {
-            projected_vertex := project(transformed_vertex)
+            projected_vertex := project(vec3_from_vec4(transformed_vertex))
 
             // Scale and translate to middle of screen
             projected_vertex.x += f32(app.window_w) / 2
             projected_vertex.y += f32(app.window_h) / 2
 
-            projected_vertices[i] = projected_vertex
+            projected_points[i] = projected_vertex
         }
 
         // Calc avg depth for each face based on transformed vertices
@@ -191,7 +209,7 @@ update :: proc() {
         avg_depth /= 3
 
         projected_triangle := Triangle{
-            points = projected_vertices,
+            points = projected_points,
             color = face.color,
             avg_depth = avg_depth,
         }
@@ -258,7 +276,7 @@ setup :: proc() {
         app.window_w,
         app.window_h,
     )
-    g_mesh = Mesh{}
+    g_mesh = init_mesh()
     g_cull_method = .Backface
     load_cube_mesh_data()
     // load_obj_file_data("./assets/cube.obj")

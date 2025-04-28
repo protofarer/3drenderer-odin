@@ -1,15 +1,10 @@
 package main
 
 import "core:math"
-import "core:math/linalg"
 
 Vec2 :: [2]f32
 Vec3 :: [3]f32
 Vec4 :: [4]f32
-
-vec2_new :: proc(x: f32, y: f32) -> Vec2 {
-    return {x, y}
-}
 
 normalize :: proc {
     normalize_vec2,
@@ -17,11 +12,28 @@ normalize :: proc {
 }
 
 normalize_vec2 :: proc(v: ^Vec2) {
-    v^ = linalg.normalize0(v^)
+    v^ /= length(v^)
 }
 
 normalize_vec3 :: proc(v: ^Vec3) {
-    v^ = linalg.normalize0(v^)
+    v^ = length(v^)
+}
+
+length :: proc {
+    length_vec2,
+    length_vec3,
+}
+
+length_vec2 :: proc(v: Vec2) -> f32 {
+    return math.sqrt(v.x * v.x + v.y + v.y)
+}
+
+length_vec3 :: proc(v: Vec3) -> f32 {
+    return math.sqrt(v.x * v.x + v.y + v.y + v.z * v.z)
+}
+
+vec2_new :: proc(x: f32, y: f32) -> Vec2 {
+    return {x, y}
 }
 
 vec3_new :: proc(x: f32, y: f32, z: f32) -> Vec3 {
@@ -36,10 +48,16 @@ vec3_invert :: proc(v: ^Vec3) {
     v^ *= -1
 }
 
-vec3_normal :: proc(a: Vec3, b: Vec3) -> Vec3 {
-    cross := linalg.cross(a, b)
-    magnitude := linalg.length(cross)
-    return cross / magnitude
+vec3_cross :: proc(a: Vec3, b: Vec3) -> Vec3 {
+    return Vec3{
+        a.y * b.z - a.z * b.y,
+        a.z * b.x - a.x * b.z,
+        a.x * b.y - a.y * b.x,
+    }
+}
+
+vec3_dot :: proc(a: Vec3, b: Vec3) -> f32 {
+    return (a.x * b.x) + (a.y * b.y) + (a.z * b.z)
 }
 
 vec3_rotate_x :: proc(v: Vec3, angle: f32) -> Vec3 {
@@ -72,8 +90,4 @@ vec4_from_vec3 :: proc(v: Vec3) -> Vec4 {
 
 vec3_from_vec4 :: proc(v: Vec4) -> Vec3 {
     return {v.x, v.y, v.z}
-}
-
-vec2_from_vec4 :: proc(v: Vec4) -> Vec2 {
-    return {v.x, v.y}
 }

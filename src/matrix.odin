@@ -1,36 +1,107 @@
 package main
 
-import "core:math/linalg"
+import "core:math"
 
-Mat3 :: linalg.Matrix3f32
-Mat4 :: linalg.Matrix4f32
+Mat3 :: matrix[3, 3]f32
+Mat4 :: matrix[4, 4]f32
 
+// | 1 0 0 0 |
+// | 0 1 0 0 |
+// | 0 0 1 0 |
+// | 0 0 0 1 |
 mat4_identity :: proc() -> Mat4 {
-    return linalg.identity(Mat4)
+    return {
+        1,0,0,0,
+        0,1,0,0,
+        0,0,1,0,
+        0,0,0,1,
+    }
 }
 
-// TODO: vec4_t mat4_mul_vec4_project(mat4_t mat_proj, vec4_t v);
+// | sx  0  0  0 |
+// |  0 sy  0  0 |
+// |  0  0 sz  0 |
+// |  0  0  0  1 |
+mat4_make_scale :: proc(s: Vec3) -> Mat4 {
+    m := mat4_identity()
+    m[0][0] = s.x
+    m[1][1] = s.y
+    m[2][2] = s.z
+    return m
+}
 
+// | 1  0  0  tx |
+// | 0  1  0  ty |
+// | 0  0  1  tz |
+// | 0  0  0  1  |
+mat4_make_translation :: proc(t: Vec3) -> Mat4 {
+    m := mat4_identity()
+    m[0][3] = t.x
+    m[1][3] = t.y
+    m[2][3] = t.z
+    return m
+}
 
-// lib 
-// - matrix3_look_at matrix4_look_at
-// - mat4 x mat4
-// - mat3/4 scale translate
-// - mat4 perspective
-// mat4_t mat4_make_scale(float sx, float sy, float sz);
-// mat4_t mat4_make_translation(float tx, float ty, float tz);
+// | 1  0  0  0 |
+// | 0  c -s  0 |
+// | 0  s  c  0 |
+// | 0  0  0  1 |
+mat4_make_rotation_x :: proc(angle: f32) -> Mat4 {
+    c := math.cos(angle)
+    s := math.sin(angle)
+    m := mat4_identity()
+    m[1][1] = c
+    m[1][2] = -s
+    m[2][1] = s
+    m[2][2] = c
+    return m
+}
 
-// - linalg.mul => 
-    // matrix_mul,
-    // matrix_mul_differ,
-    // matrix_mul_vector, matrix_mul_vector(a: Mat, b: Vec)
-// vec4_t mat4_mul_vec4(mat4_t m, vec4_t v);
+// |  c  0  s  0 |
+// |  0  1  0  0 |
+// | -s  0  c  0 |
+// |  0  0  0  1 |
+mat4_make_rotation_y :: proc(angle: f32) -> Mat4 {
+    c := math.cos(angle)
+    s := math.sin(angle)
+    m := mat4_identity()
+    m[0][0] = c
+    m[0][2] = s
+    m[2][0] = -s
+    m[2][2] = c
+    return m
+}
 
-// linalg.matrix4_from_euler_angle_x/y/z
-// mat4_t mat4_make_rotation_x(float angle);
-// mat4_t mat4_make_rotation_y(float angle);
-// mat4_t mat4_make_rotation_z(float angle);
+// | c -s  0  0 |
+// | s  c  0  0 |
+// | 0  0  1  0 |
+// | 0  0  0  1 |
+mat4_make_rotation_z :: proc(angle: f32) -> Mat4 {
+    c := math.cos(angle)
+    s := math.sin(angle)
+    m := mat4_identity()
+    m[0][0] = c
+    m[0][1] = -s
+    m[1][0] = s
+    m[1][1] = c
+    return m
+}
 
-// linalg.matrix4_perspective(fovy, aspect, near, far, flip_z_axis)
-// mat4_t mat4_make_perspective(float fov, float aspect, float znear, float zfar);
+mat4_mul_vec4 :: proc(m: Mat4, v: Vec4) -> Vec4 {
+    out: Vec4
+    out.x = m[0, 0] * v.x + m[0, 1] * v.y + m[0, 2] * v.z + m[0, 3] * v.w
+    out.y = m[1, 0] * v.x + m[1, 1] * v.y + m[1, 2] * v.z + m[1, 3] * v.w
+    out.z = m[2, 0] * v.x + m[2, 1] * v.y + m[2, 2] * v.z + m[2, 3] * v.w
+    out.w = m[3, 0] * v.x + m[3, 1] * v.y + m[3, 2] * v.z + m[3, 3] * v.w
+    return out
+}
 
+mat4_mul_mat4 :: proc(a: Mat4, b: Mat4) -> Mat4 {
+    m: Mat4
+    for i in 0..<4 {
+        for j in 0..<4 {
+            m[i,j] = a[i,0]*b[0,j] + a[i,1]*b[1,j] + a[i,2]*b[2,j] + a[i,3]*b[3,j]
+        }
+    }
+    return m
+}
