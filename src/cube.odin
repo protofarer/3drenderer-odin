@@ -14,57 +14,81 @@ cube_mesh_vertices := [?]Vec3{
 cube_mesh_faces := [?]Face{
     // front
     {
-        indices = {1,2,3},
-        color = 0xFFFF0000,
+        a = 1,
+        b = 2,
+        c = 3,
+        color = 0xFFFFFFFF,
     },
     {
-        indices = {1,3,4},
-        color = 0xFFFF0000,
+        a = 1,
+        b = 3,
+        c = 4,
+        color = 0xFFFFFFFF,
     },
     //right
     {
-        indices = {4,3,5},
-        color = 0xFF00FF00,
+        a = 4,
+        b = 3,
+        c = 5,
+        color = 0xFFFFFFFF,
     },
     {
-        indices = {4,5,6},
-        color = 0xFF00FF00,
+        a = 4,
+        b = 5,
+        c = 6,
+        color = 0xFFFFFFFF,
     },
     // back
     {
-        indices = {6,5,7},
-        color = 0xFF0000FF,
+        a = 6,
+        b = 5,
+        c = 7,
+        color = 0xFFFFFFFF,
     },
     {
-        indices = {6,7,8},
-        color = 0xFF0000FF,
+        a = 6,
+        b = 7,
+        c = 8,
+        color = 0xFFFFFFFF,
     },
     // left
     {
-        indices = {8,7,2},
-        color = 0xFFFF00FF,
+        a = 8,
+        b = 7,
+        c = 2,
+        color = 0xFFFFFFFF,
     },
     {
-        indices = {8,2,1},
-        color = 0xFFFF00FF,
+        a = 8,
+        b = 2,
+        c = 1,
+        color = 0xFFFFFFFF,
     },
     // top
     {
-        indices = {2,7,5},
-        color = 0xFF00FFFF,
+        a = 2,
+        b = 7,
+        c = 5,
+        color = 0xFFFFFFFF,
     },
     {
-        indices = {2,5,3},
-        color = 0xFF00FFFF,
+        a = 2,
+        b = 5,
+        c = 3,
+        color = 0xFFFFFFFF,
     },
     // bottom
     {
-        indices = {6,8,1},
-        color = 0xFFFFFF00,
+        a = 6,
+        b = 8,
+        c = 1,
+        color = 0xFFFFFFFF,
     },
     {
-        indices = {6,1,4},
-        color = 0xFFFFFF00,
+        a = 6,
+        b = 1,
+        c = 4,
+        color = 0xFFFFFFFF,
     },
 }
 

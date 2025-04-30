@@ -24,9 +24,9 @@ mat4_identity :: proc() -> Mat4 {
 // |  0  0  0  1 |
 mat4_make_scale :: proc(s: Vec3) -> Mat4 {
     m := mat4_identity()
-    m[0][0] = s.x
-    m[1][1] = s.y
-    m[2][2] = s.z
+    m[0,0] = s.x
+    m[1,1] = s.y
+    m[2,2] = s.z
     return m
 }
 
@@ -36,9 +36,9 @@ mat4_make_scale :: proc(s: Vec3) -> Mat4 {
 // | 0  0  0  1  |
 mat4_make_translation :: proc(t: Vec3) -> Mat4 {
     m := mat4_identity()
-    m[0][3] = t.x
-    m[1][3] = t.y
-    m[2][3] = t.z
+    m[0,3] = t.x
+    m[1,3] = t.y
+    m[2,3] = t.z
     return m
 }
 
@@ -50,10 +50,10 @@ mat4_make_rotation_x :: proc(angle: f32) -> Mat4 {
     c := math.cos(angle)
     s := math.sin(angle)
     m := mat4_identity()
-    m[1][1] = c
-    m[1][2] = -s
-    m[2][1] = s
-    m[2][2] = c
+    m[1,1] = c
+    m[1,2] = -s
+    m[2,1] = s
+    m[2,2] = c
     return m
 }
 
@@ -65,10 +65,10 @@ mat4_make_rotation_y :: proc(angle: f32) -> Mat4 {
     c := math.cos(angle)
     s := math.sin(angle)
     m := mat4_identity()
-    m[0][0] = c
-    m[0][2] = s
-    m[2][0] = -s
-    m[2][2] = c
+    m[0,0] = c
+    m[0,2] = s
+    m[2,0] = -s
+    m[2,2] = c
     return m
 }
 
@@ -80,10 +80,10 @@ mat4_make_rotation_z :: proc(angle: f32) -> Mat4 {
     c := math.cos(angle)
     s := math.sin(angle)
     m := mat4_identity()
-    m[0][0] = c
-    m[0][1] = -s
-    m[1][0] = s
-    m[1][1] = c
+    m[0,0] = c
+    m[0,1] = -s
+    m[1,0] = s
+    m[1,1] = c
     return m
 }
 
@@ -104,4 +104,24 @@ mat4_mul_mat4 :: proc(a: Mat4, b: Mat4) -> Mat4 {
         }
     }
     return m
+}
+
+mat4_make_perspective :: proc(fov: f32, aspect: f32, znear: f32, zfar: f32) -> Mat4 {
+    m: Mat4
+    k := (1 / math.tan(fov / 2))
+    m[0,0] = aspect * k
+    m[1,1] = k
+    m[2,2] = (-zfar * znear) / (zfar - znear)
+    m[3,2] = 1
+    return m
+}
+
+mat4_mul_vec4_project :: proc(mat_proj: Mat4, v: Vec4) -> Vec4 {
+    out := mat4_mul_vec4(mat_proj, v)
+    if out.w != 0 {
+        out.x /= out.w
+        out.y /= out.w
+        out.z /= out.w
+    }
+    return out
 }

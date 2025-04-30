@@ -48,8 +48,15 @@ load_obj_file_data :: proc(filename: string) {
             for group, i in splits[1:4] {
                 num_strings := strings.split(group, "/")
                 val := strconv.parse_int(num_strings[0]) or_else 0
-                face.indices[i] = val
+                if i == 0 {
+                    face.a = val
+                } else if i == 1 {
+                    face.b = val
+                } else if i == 2 {
+                    face.c = val
+                }
             }
+            face.color = 0xFFFFFFFF
             append(&faces, face)
         case:
         }

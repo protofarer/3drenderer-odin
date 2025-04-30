@@ -2,8 +2,13 @@ package main
 
 // Vertex indices, order matters
 Face :: struct {
-    indices: [3]int,
+    a: int,
+    b: int,
+    c: int,
     color: Color_Value,
+    a_uv: Tex2,
+    b_uv: Tex2,
+    c_uv: Tex2,
 }
 
 Triangle :: struct {

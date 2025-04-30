@@ -12,11 +12,22 @@ normalize :: proc {
 }
 
 normalize_vec2 :: proc(v: ^Vec2) {
-    v^ /= length(v^)
+    l := length(v^)
+    if l == 0 do return
+    v.x /= l
+    v.y /= l
+    // TODO: verify this
+    // v^ /= l
 }
 
 normalize_vec3 :: proc(v: ^Vec3) {
-    v^ = length(v^)
+    l := length(v^)
+    if l == 0 do return
+    v.x /= l
+    v.y /= l
+    v.z /= l
+    // TODO: verify this
+    // v^ /= l
 }
 
 length :: proc {
@@ -25,11 +36,11 @@ length :: proc {
 }
 
 length_vec2 :: proc(v: Vec2) -> f32 {
-    return math.sqrt(v.x * v.x + v.y + v.y)
+    return math.sqrt(v.x * v.x + v.y * v.y)
 }
 
 length_vec3 :: proc(v: Vec3) -> f32 {
-    return math.sqrt(v.x * v.x + v.y + v.y + v.z * v.z)
+    return math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z)
 }
 
 vec2_new :: proc(x: f32, y: f32) -> Vec2 {

@@ -44,14 +44,16 @@ draw_pixel :: proc {
 draw_pixel_i32 :: proc(x: i32, y: i32, color: Color_Value = DEFAULT_COLOR) {
     condition := x >= 0 && x < app.window_w && y >= 0 && y < app.window_h
     // if !condition do return
-    assert(condition, "Pixel must be within window bounds")
+    // assert(condition, "Pixel must be within window bounds")
+    if !condition do return
     g_color_buffer[(app.window_w * y) + x] = color
 }
 
 draw_pixel_f32 :: proc(x: f32, y: f32, color: Color_Value = DEFAULT_COLOR) {
     condition := x >= 0 && x < f32(app.window_w) && y >= 0 && y < f32(app.window_h)
     // if !condition do return
-    assert(condition, "Pixel must be within window bounds")
+    // assert(condition, "Pixel must be within window bounds")
+    if !condition do return
     g_color_buffer[(app.window_w * i32(y)) + i32(x)] = color
 }
 
@@ -130,21 +132,24 @@ draw_filled_triangle :: proc(triangle: Triangle) {
         swap(&p[0].y, &p[1].y)
         swap(&p[0].x, &p[1].x)
     }
-    if p[0].y == p[1].y {
-        fill_flat_top_triangle(p[0].x, p[0].y, p[1].x, p[1].y, p[2].x, p[2].y, triangle.color)
-    } else if p[1].y == p[2].y {
+
+    if p[1].y == p[2].y {
         fill_flat_bottom_triangle(p[0].x, p[0].y, p[1].x, p[1].y, p[2].x, p[2].y, triangle.color)
+    } else if p[0].y == p[1].y {
+        fill_flat_top_triangle(p[0].x, p[0].y, p[1].x, p[1].y, p[2].x, p[2].y, triangle.color)
     } else {
-        xm := ((p[1].y - p[0].y) * (p[2].x - p[0].x) / (p[2].y - p[0].y)) + p[0].x
         ym := p[1].y
+        // looking for issue, why lines appear at fill edges
+        // xm := ((p[1].y - p[0].y) * (p[2].x - p[0].x) / (p[2].y - p[0].y)) + p[0].x
+        xm := ((p[2].x - p[0].x) * (p[1].y - p[0].y) / (p[2].y - p[0].y)) + p[0].x
         fill_flat_bottom_triangle(p[0].x, p[0].y, p[1].x, p[1].y, xm, ym, triangle.color)
         fill_flat_top_triangle(p[1].x, p[1].y, xm, ym, p[2].x, p[2].y, triangle.color)
     }
 }
 
 fill_flat_bottom_triangle :: proc(x0, y0, x1, y1, x2, y2: f32, color: Color_Value = DEFAULT_COLOR) {
-    inv_slope_1 := (x1-x0) / (y1-y0)
-    inv_slope_2 := (x2-x0) / (y2-y0)
+    inv_slope_1 := (x1 - x0) / (y1 - y0)
+    inv_slope_2 := (x2 - x0) / (y2 - y0)
     x_left := x0
     x_right := x0
     for y := y0; y <= y2; y += 1 {
@@ -155,8 +160,10 @@ fill_flat_bottom_triangle :: proc(x0, y0, x1, y1, x2, y2: f32, color: Color_Valu
 }
 
 fill_flat_top_triangle :: proc(x0, y0, x1, y1, x2, y2: f32, color: Color_Value = DEFAULT_COLOR) {
-    inv_slope_1 := (x0-x2) / (y0-y2)
-    inv_slope_2 := (x1-x2) / (y1-y2)
+    // inv_slope_1 := (x0 - x2) / (y0 - y2)
+    // inv_slope_2 := (x1 - x2) / (y1 - y2)
+    inv_slope_1 := (x2 - x0) / (y2 - y0)
+    inv_slope_2 := (x2 - x1) / (y2 - y1)
     x_left := x2
     x_right := x2
     for y := y2; y >= y0; y -= 1 {
