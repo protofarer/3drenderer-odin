@@ -5,6 +5,7 @@ import "core:log"
 import sdl "vendor:sdl3"
 import "core:sort"
 import "core:math"
+import "core:mem"
 
 pr :: fmt.println
 
@@ -25,6 +26,8 @@ Render_Mode :: enum {
     Wireframe,
     Filled_Triangles,
     Filled_Triangles_And_Wireframe,
+    Textured,
+    Textured_And_Wireframe,
 }
 
 Cull_Method :: enum {
@@ -32,17 +35,23 @@ Cull_Method :: enum {
     Backface,
 }
 
-g_color_buffer: []u32
-g_color_buffer_texture: ^sdl.Texture
 g_previous_frame_time: u64
 g_camera_position: Vec3 = {0, 0, 0}
-// g_fov_factor: f32 = 640
+
+g_color_buffer: []u32
+g_color_buffer_texture: ^sdl.Texture
+
 g_proj_matrix: Mat4
 g_triangles_to_render: [dynamic]Triangle
+
 g_mesh: Mesh
+g_texture: []u32
+g_texture_width: i32
+g_texture_height: i32
+g_light: Light
+
 g_render_mode: Render_Mode
 g_cull_method: Cull_Method
-g_light: Light
 
 main :: proc() {
     context.logger = log.create_console_logger()
@@ -109,6 +118,10 @@ process_input :: proc() {
                 g_render_mode = .Filled_Triangles
             case sdl.K_4:
                 g_render_mode = .Filled_Triangles_And_Wireframe
+            case sdl.K_5:
+                g_render_mode = .Textured
+            case sdl.K_6:
+                g_render_mode = .Textured_And_Wireframe
             case sdl.K_C:
                 g_cull_method = .Backface
             case sdl.K_D:
@@ -171,7 +184,7 @@ update :: proc() {
         normalize(&vector_ab) // WARN extra instructions, possibly rm if not used later
         normalize(&vector_ac) // WARN extra instructions, possibly rm if not used later
 
-        normal := vec3_cross(vector_ab, vector_ac) // coordinate handedness dependent
+        normal := cross(vector_ab, vector_ac) // coordinate handedness dependent
         normalize(&normal)
 
         // form camera ray with A, points towards camera
@@ -187,7 +200,7 @@ update :: proc() {
         }
 
         // Projections
-        projected_points: [3]Vec2
+        projected_points: [3]Vec4
         for transformed_vertex, i in transformed_vertices {
             // projected_vertex := project(vec3_from_vec4(transformed_vertex))
             projected_vertex := mat4_mul_vec4_project(g_proj_matrix, transformed_vertex)
@@ -203,7 +216,7 @@ update :: proc() {
             projected_vertex.x += f32(app.window_w) / 2
             projected_vertex.y += f32(app.window_h) / 2
 
-            projected_points[i] = projected_vertex.xy
+            projected_points[i] = projected_vertex
         }
 
         // Calc avg depth for each face based on transformed vertices
@@ -222,6 +235,11 @@ update :: proc() {
             points = projected_points,
             color = triangle_color,
             avg_depth = avg_depth,
+            texcoords = {
+                {face.a_uv.u, face.a_uv.v},
+                {face.b_uv.u, face.b_uv.v},
+                {face.c_uv.u, face.c_uv.v},
+            }
         }
         append(&g_triangles_to_render, projected_triangle)
     }
@@ -247,7 +265,8 @@ render :: proc() {
                 draw_rect_filled(point.x - 3, point.y - 3, 6, 6, 0xFFFF0000)
             }
         }
-        if g_render_mode == .Wireframe_And_Vertices || g_render_mode == .Wireframe || g_render_mode == .Filled_Triangles_And_Wireframe {
+
+        if g_render_mode == .Wireframe_And_Vertices || g_render_mode == .Wireframe || g_render_mode == .Filled_Triangles_And_Wireframe || g_render_mode == .Textured_And_Wireframe {
             draw_triangle(
                 triangle.points[0].x, triangle.points[0].y,
                 triangle.points[1].x, triangle.points[1].y,
@@ -255,6 +274,11 @@ render :: proc() {
                 0xFF00FF00
             )
         }
+
+        if g_render_mode == .Textured || g_render_mode == .Textured_And_Wireframe {
+            draw_textured_triangle(triangle, g_texture)
+        }
+
         if g_render_mode == .Filled_Triangles || g_render_mode == .Filled_Triangles_And_Wireframe {
             draw_filled_triangle(triangle)
         }
@@ -295,9 +319,13 @@ setup :: proc() {
     g_light = {
         direction = {0, 0, 1}
     }
-    // load_cube_mesh_data()
+    // Manually load hardcoded brick texture
+    g_texture = mem.slice_data_cast([]u32, redbrick_texture[:])
+    g_texture_width = 64
+    g_texture_height = 64
+    load_cube_mesh_data()
     // load_obj_file_data("./assets/cube.obj")
-    load_obj_file_data("./assets/f22.obj")
+    // load_obj_file_data("./assets/f22.obj")
 }
 
 clear_color_buffer :: proc(color: u32) {

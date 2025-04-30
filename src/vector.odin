@@ -59,6 +59,15 @@ vec3_invert :: proc(v: ^Vec3) {
     v^ *= -1
 }
 
+cross :: proc {
+    vec2_cross,
+    vec3_cross,
+}
+
+vec2_cross :: proc(a: Vec2, b: Vec2) -> f32 {
+    return a.x * b.y - a.y * b.x
+}
+
 vec3_cross :: proc(a: Vec3, b: Vec3) -> Vec3 {
     return Vec3{
         a.y * b.z - a.z * b.y,
