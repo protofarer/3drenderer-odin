@@ -304,7 +304,7 @@ setup :: proc() {
     g_color_buffer = color_buffer
     g_color_buffer_texture = sdl.CreateTexture(
         app.renderer, 
-        sdl.PixelFormat.ARGB8888,
+        sdl.PixelFormat.ABGR8888, // PNG RGBA internally, on little-endian (AMD) bytes reversed
         sdl.TextureAccess.STREAMING,
         app.window_w,
         app.window_h,
@@ -319,13 +319,17 @@ setup :: proc() {
     g_light = {
         direction = {0, 0, 1}
     }
+
     // Manually load hardcoded brick texture
-    g_texture = mem.slice_data_cast([]u32, redbrick_texture[:])
-    g_texture_width = 64
-    g_texture_height = 64
+    // g_texture = mem.slice_data_cast([]u32, redbrick_texture[:])
+    // g_texture_width = 64
+    // g_texture_height = 64
+
     load_cube_mesh_data()
     // load_obj_file_data("./assets/cube.obj")
     // load_obj_file_data("./assets/f22.obj")
+
+    load_png_texture_data("./assets/cube.png")
 }
 
 clear_color_buffer :: proc(color: u32) {
