@@ -222,13 +222,6 @@ update :: proc() {
             projected_points[i] = projected_vertex
         }
 
-        // Calc avg depth for each face based on transformed vertices
-        avg_depth: f32
-        for v in transformed_vertices {
-            avg_depth += v.z
-        }
-        avg_depth /= 3
-
         // Apply lighting
         light_intensity_factor := -vec3_dot(normal, g_light.direction)
         // pr(light_intensity_factor)
@@ -237,7 +230,6 @@ update :: proc() {
         projected_triangle := Triangle{
             points = projected_points,
             color = triangle_color,
-            avg_depth = avg_depth,
             texcoords = {
                 {face.a_uv.u, face.a_uv.v},
                 {face.b_uv.u, face.b_uv.v},
@@ -246,19 +238,7 @@ update :: proc() {
         }
         append(&g_triangles_to_render, projected_triangle)
     }
-    // Sort triangles to render by avg_depth
-
-    sort_triangles_by_depth(g_triangles_to_render[:])
 }
-
-sort_triangles_by_depth :: proc(g_triangles_to_render: []Triangle) {
-    sort.quick_sort_proc(g_triangles_to_render, compare_triangle_depth_desc)
-}
-
-compare_triangle_depth_desc :: proc(a: Triangle, b: Triangle) -> int {
-    return sort.compare_f32s(b.avg_depth, a.avg_depth)
-}
-
 
 render :: proc() {
     draw_grid()
@@ -354,10 +334,5 @@ render_color_buffer :: proc() {
 }
 
 clear_z_buffer :: proc() {
-    for y in 0..<app.window_h {
-        for x in 0..<app.window_w {
-            // set to 1, not 0 because z values grow into the monitor, thus highest depth (the "zero" value)
-            g_z_buffer[(app.window_w * y) + x] = 1
-        }
-    }
+    mem.zero_slice(g_z_buffer)
 }

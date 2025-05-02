@@ -16,7 +16,6 @@ Face :: struct {
 Triangle :: struct {
     points: [3]Vec4,
     color: Color_Value,
-    avg_depth: f32,
     texcoords: Tex_Coords
 }
 Tex_Coords :: [3]Tex2
@@ -32,27 +31,86 @@ draw_filled_triangle :: proc(triangle: Triangle) {
     if p[0].y > p[1].y {
         swap(&p[0].y, &p[1].y)
         swap(&p[0].x, &p[1].x)
+        swap(&p[0].z, &p[1].z)
+        swap(&p[0].w, &p[1].w)
     }
     if p[1].y > p[2].y {
         swap(&p[1].y, &p[2].y)
         swap(&p[1].x, &p[2].x)
+        swap(&p[1].z, &p[2].z)
+        swap(&p[1].w, &p[2].w)
     }
     if p[0].y > p[1].y {
         swap(&p[0].y, &p[1].y)
         swap(&p[0].x, &p[1].x)
+        swap(&p[0].z, &p[1].z)
+        swap(&p[0].w, &p[1].w)
     }
 
-    if p[1].y == p[2].y {
-        fill_flat_bottom_triangle(p[0].x, p[0].y, p[1].x, p[1].y, p[2].x, p[2].y, triangle.color)
-    } else if p[0].y == p[1].y {
-        fill_flat_top_triangle(p[0].x, p[0].y, p[1].x, p[1].y, p[2].x, p[2].y, triangle.color)
-    } else {
-        ym := p[1].y
-        // looking for issue, why lines appear at fill edges
-        // xm := ((p[1].y - p[0].y) * (p[2].x - p[0].x) / (p[2].y - p[0].y)) + p[0].x
-        xm := ((p[2].x - p[0].x) * (p[1].y - p[0].y) / (p[2].y - p[0].y)) + p[0].x
-        fill_flat_bottom_triangle(p[0].x, p[0].y, p[1].x, p[1].y, xm, ym, triangle.color)
-        fill_flat_top_triangle(p[1].x, p[1].y, xm, ym, p[2].x, p[2].y, triangle.color)
+    point_a := p[0]
+    point_b := p[1]
+    point_c := p[2]
+
+    // render flat bottom (top) triangle
+    inv_slope_1: f32 = 0
+    inv_slope_2: f32 = 0
+
+    if p[1].y - p[0].y != 0 do inv_slope_1 = (p[1].x - p[0].x) / math.abs(p[1].y - p[0].y)
+    if p[2].y - p[0].y != 0 do inv_slope_2 = (p[2].x - p[0].x) / math.abs(p[2].y - p[0].y)
+
+    // don't render a triangle perpendicular to camera (a line)
+    if p[1].y - p[0].y != 0 {
+        for y := p[0].y; y <= p[1].y; y += 1 {
+            x_start := p[1].x + (y - p[1].y) * inv_slope_1
+            x_end := p[0].x + (y - p[0].y) * inv_slope_2
+
+            if x_end < x_start do swap(&x_start, &x_end)
+
+            for x := x_start; x <= x_end; x += 1 {
+                draw_triangle_pixel(x, y, triangle)
+            }
+        }
+    }
+
+    // render flat top (bottom) triangle
+    inv_slope_1 = 0
+    inv_slope_2 = 0
+
+    if p[2].y - p[1].y != 0 do inv_slope_1 = (p[2].x - p[1].x) / math.abs(p[2].y - p[1].y)
+    if p[2].y - p[0].y != 0 do inv_slope_2 = (p[2].x - p[0].x) / math.abs(p[2].y - p[0].y)
+
+    // don't render a triangle perpendicular to camera (a line)
+    if p[2].y - p[1].y != 0 {
+        for y := p[1].y; y <= p[2].y; y += 1 {
+            x_start := p[1].x + (y - p[1].y) * inv_slope_1
+            x_end := p[0].x + (y - p[0].y) * inv_slope_2
+
+            if x_end < x_start do swap(&x_start, &x_end)
+
+            for x := x_start; x <= x_end; x += 1 {
+                draw_triangle_pixel(x, y, triangle)
+            }
+        }
+    }
+}
+
+draw_triangle_pixel :: proc(x, y: f32, triangle: Triangle) {
+    p := Vec2{x,y}
+    point_a := triangle.points[0]
+    point_b := triangle.points[1]
+    point_c := triangle.points[2]
+    weights := barycentric_weights(point_a.xy, point_b.xy, point_c.xy, p)
+    alpha := weights.x
+    beta := weights.y
+    gamma := weights.z
+    interpolated_reciprocal_w := (1 / point_a.w) * alpha + (1 / point_b.w) * beta + (1 / point_c.w) * gamma
+
+    // diverge from course, since now z_buffer cleared to 0 instead of 1
+    // interpolated_reciprocal_w = 1 - interpolated_reciprocal_w
+
+    if interpolated_reciprocal_w > g_z_buffer[(app.window_w * i32(y)) + i32(x)] {
+        draw_pixel(x, y, triangle.color)
+        g_z_buffer[(app.window_w * i32(y)) + i32(x)] = interpolated_reciprocal_w
     }
 }
 
