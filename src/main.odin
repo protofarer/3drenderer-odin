@@ -6,6 +6,7 @@ import sdl "vendor:sdl3"
 import "core:sort"
 import "core:math"
 import "core:mem"
+import "core:image"
 
 pr :: fmt.println
 
@@ -52,6 +53,8 @@ g_light: Light
 
 g_render_mode: Render_Mode
 g_cull_method: Cull_Method
+
+g_z_buffer: []f32
 
 main :: proc() {
     context.logger = log.create_console_logger()
@@ -139,8 +142,8 @@ update :: proc() {
     }
     g_previous_frame_time = sdl.GetTicks()
 
-    g_mesh.rotation.x += 0.01
-    // g_mesh.rotation.y += 0.05
+    g_mesh.rotation.x += 0.02
+    // g_mesh.rotation.y += -0.02
     // g_mesh.rotation.z += 0.05
 
     // g_mesh.scale.x += 0.02
@@ -165,9 +168,9 @@ update :: proc() {
     g_triangles_to_render = make([dynamic]Triangle, context.temp_allocator)
     for face, i in g_mesh.faces {
         face_vertices: [3]Vec3
-        face_vertices[0] = g_mesh.vertices[face.a - 1]
-        face_vertices[1] = g_mesh.vertices[face.b - 1]
-        face_vertices[2] = g_mesh.vertices[face.c - 1]
+        face_vertices[0] = g_mesh.vertices[face.a]
+        face_vertices[1] = g_mesh.vertices[face.b]
+        face_vertices[2] = g_mesh.vertices[face.c]
 
         // Transformations
         transformed_vertices: [3]Vec4
@@ -285,6 +288,7 @@ render :: proc() {
     }
     render_color_buffer()
     clear_color_buffer(0xFF000000)
+    clear_z_buffer()
     sdl.RenderPresent(app.renderer)
 }
 
@@ -292,13 +296,16 @@ shutdown :: proc() {
     sdl.DestroyRenderer(app.renderer)
     sdl.DestroyWindow(app.window)
     sdl.Quit()
+    delete(g_z_buffer)
     delete(g_mesh.faces)
     delete(g_mesh.vertices)
     delete(g_triangles_to_render)
+    delete(g_texture)
     return
 }
 
 setup :: proc() {
+    log.info("Begin setup...")
     // allocate and slice
     color_buffer := make([]u32, app.window_w * app.window_h)
     g_color_buffer = color_buffer
@@ -320,16 +327,17 @@ setup :: proc() {
         direction = {0, 0, 1}
     }
 
+    g_z_buffer = make([]f32, app.window_h * app.window_w)
+
     // Manually load hardcoded brick texture
     // g_texture = mem.slice_data_cast([]u32, redbrick_texture[:])
     // g_texture_width = 64
     // g_texture_height = 64
 
-    load_cube_mesh_data()
-    // load_obj_file_data("./assets/cube.obj")
-    // load_obj_file_data("./assets/f22.obj")
-
-    load_png_texture_data("./assets/cube.png")
+    // load_cube_mesh_data()
+    load_obj_file_data("./assets/f117.obj")
+    load_png_texture_data("./assets/f117.png")
+    log.info("Setup complete")
 }
 
 clear_color_buffer :: proc(color: u32) {
@@ -345,9 +353,11 @@ render_color_buffer :: proc() {
     sdl.RenderTexture(app.renderer, g_color_buffer_texture, nil, nil)
 }
 
-// project :: proc(point: Vec3) -> Vec2 {
-//     return Vec2{
-//         (point.x * g_fov_factor) / point.z, 
-//         (point.y * g_fov_factor) / point.z,
-//     }
-// }
+clear_z_buffer :: proc() {
+    for y in 0..<app.window_h {
+        for x in 0..<app.window_w {
+            // set to 1, not 0 because z values grow into the monitor, thus highest depth (the "zero" value)
+            g_z_buffer[(app.window_w * y) + x] = 1
+        }
+    }
+}

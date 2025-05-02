@@ -17,8 +17,9 @@ Triangle :: struct {
     points: [3]Vec4,
     color: Color_Value,
     avg_depth: f32,
-    texcoords: [3]Tex2
-} 
+    texcoords: Tex_Coords
+}
+Tex_Coords :: [3]Tex2
 
 draw_triangle :: proc(x0,y0,x1,y1,x2,y2: f32, color: Color_Value = DEFAULT_COLOR) {
     draw_line(x0, y0, x1, y1, color)
@@ -114,16 +115,20 @@ draw_texel :: proc(
     interpolated_v /= interpolated_reciprocal_w
 
     // Map u,v, to full texture width and height
-    // hacky to mod the length
+    // hacky to keep resulting index within bounds. This is a hack because of negative (invalid) weights
     tex_x := math.abs(i32(interpolated_u * f32(g_texture_width))) % g_texture_width
     tex_y := math.abs(i32(interpolated_v * f32(g_texture_height))) % g_texture_height
 
-    // TODO: this is a hack, tex_x/y calcs may be wrong
-    index := ((g_texture_width * tex_y) + tex_x)
-    // if int(index) >= len(texture) {
-    //     return
-    // }
-    draw_pixel(x, y, texture[index])
+    // (hack) Adjust 1/w so that closer pixels have smaller values
+    interpolated_reciprocal_w = 1 - interpolated_reciprocal_w
+
+
+    if interpolated_reciprocal_w < g_z_buffer[(app.window_w * i32(y)) + i32(x)] {
+        index := ((g_texture_width * tex_y) + tex_x)
+        // if int(index) >= len(texture) { return }
+        draw_pixel(x, y, texture[index])
+        g_z_buffer[(app.window_w * i32(y)) + i32(x)] = interpolated_reciprocal_w
+    }
 }
 
 draw_textured_triangle :: proc(triangle: Triangle, texture: []u32) {
@@ -153,6 +158,10 @@ draw_textured_triangle :: proc(triangle: Triangle, texture: []u32) {
         swap(&t[0].u, &t[1].u)
         swap(&t[0].v, &t[1].v)
     }
+
+    t[0].v = 1 - t[0].v
+    t[1].v = 1 - t[1].v
+    t[2].v = 1 - t[2].v
 
     point_a := p[0]
     point_b := p[1]

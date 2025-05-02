@@ -27,6 +27,8 @@ load_obj_file_data :: proc(filename: string) {
 
     vertices: [dynamic]Vec3
     faces: [dynamic]Face
+    tex_coords: [dynamic]Tex2
+    defer delete(tex_coords)
 
     string_data := string(raw_data)
     lines, ok := strings.split(string_data, "\n")
@@ -38,26 +40,34 @@ load_obj_file_data :: proc(filename: string) {
         switch first_word {
         case "v":
             vertex: Vec3
-            for word, i in splits[1:4] {
-                val := strconv.parse_f32(word) or_else 0
-                vertex[i] = val
-            }
+            vertex[0] = strconv.parse_f32(splits[1]) or_else 0
+            vertex[1] = strconv.parse_f32(splits[2]) or_else 0
+            vertex[2] = strconv.parse_f32(splits[3]) or_else 0
             append(&vertices, vertex)
         case "f":
             face: Face
             for group, i in splits[1:4] {
-                num_strings := strings.split(group, "/")
-                val := strconv.parse_int(num_strings[0]) or_else 0
+                val_strings := strings.split(group, "/")
+                vertex_no := strconv.parse_int(val_strings[0]) or_else 0
+                tex_coord_no := strconv.parse_int(val_strings[1]) or_else 0
                 if i == 0 {
-                    face.a = val
+                    face.a = vertex_no - 1
+                    face.a_uv = tex_coords[tex_coord_no - 1]
                 } else if i == 1 {
-                    face.b = val
+                    face.b = vertex_no - 1
+                    face.b_uv = tex_coords[tex_coord_no - 1]
                 } else if i == 2 {
-                    face.c = val
+                    face.c = vertex_no - 1
+                    face.c_uv = tex_coords[tex_coord_no - 1]
                 }
             }
             face.color = 0xFFFFFFFF
             append(&faces, face)
+        case "vt":
+            tex_coord: Tex2
+            tex_coord.u = strconv.parse_f32(splits[1]) or_else 0
+            tex_coord.v = strconv.parse_f32(splits[2]) or_else 0
+            append(&tex_coords, tex_coord)
         case:
         }
     }
