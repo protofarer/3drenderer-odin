@@ -131,8 +131,22 @@ process_input :: proc() {
                 g_render_mode = .Textured_And_Wireframe
             case sdl.K_C:
                 g_cull_method = .Backface
-            case sdl.K_D:
+            case sdl.K_X:
                 g_cull_method = .None
+            case sdl.K_UP:
+                g_camera.position.y += 5 * g_dt
+            case sdl.K_DOWN:
+                g_camera.position.y -= 5 * g_dt
+            case sdl.K_A:
+                g_camera.yaw += 0.3 * g_dt
+            case sdl.K_D:
+                g_camera.yaw -= 0.3 * g_dt
+            case sdl.K_W:
+                g_camera.forward_velocity = g_camera.direction * (10 * g_dt)
+                g_camera.position += g_camera.forward_velocity
+            case sdl.K_S:
+                g_camera.forward_velocity = g_camera.direction * (10 * g_dt)
+                g_camera.position -= g_camera.forward_velocity
             }
         }
     }
@@ -150,15 +164,10 @@ update :: proc() {
     g_mesh.rotation.x += 0.02 * g_dt
     // g_mesh.rotation.y += -0.02
     // g_mesh.rotation.z += 0.05
-
     // g_mesh.scale.x += 0.02
     // g_mesh.scale.y += 0.02
     // g_mesh.translation.x += 0.1
     g_mesh.translation.z = 4
-
-    // animate camera
-    g_camera.position.x += 0.05
-    g_camera.position.y += 0.05
 
     scale_matrix := mat4_make_scale(g_mesh.scale)
     rotation_matrix_x := mat4_make_rotation_x(g_mesh.rotation.x)
@@ -167,8 +176,16 @@ update :: proc() {
     translation_matrix := mat4_make_translation(g_mesh.translation)
 
     // View matrix
-    target := Vec3{0,0,4} // placeholder
-    up_direction := Vec3{0,1,0}
+    up_direction := Vec3{0, 1, 0}
+
+    // Init target looking down z-axis
+    target := Vec3{0, 0, 1}
+    camera_yaw_rotation := mat4_make_rotation_y(g_camera.yaw)
+    g_camera.direction = vec3_from_vec4(mat4_mul_vec4(camera_yaw_rotation, vec4_from_vec3(target)))
+
+    // Offset camera position in direction ("ray", because magnitude is important) where camera is pointing at
+    target = g_camera.position + g_camera.direction
+
     view_matrix := mat4_look_at(g_camera.position, target, up_direction)
 
     world_matrix := mat4_identity()

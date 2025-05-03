@@ -3,6 +3,8 @@ package main
 Camera :: struct {
     position: Vec3,
     direction: Vec3,
+    forward_velocity: Vec3,
+    yaw: f32,
 }
 
 mat4_look_at :: proc(eye: Vec3, target: Vec3, up: Vec3) -> Mat4 {
