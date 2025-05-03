@@ -178,10 +178,10 @@ draw_texel :: proc(
     tex_y := math.abs(i32(interpolated_v * f32(g_texture_height))) % g_texture_height
 
     // (hack) Adjust 1/w so that closer pixels have smaller values
-    interpolated_reciprocal_w = 1 - interpolated_reciprocal_w
+   // interpolated_reciprocal_w = 1 - interpolated_reciprocal_w
 
 
-    if interpolated_reciprocal_w < g_z_buffer[(app.window_w * i32(y)) + i32(x)] {
+   if interpolated_reciprocal_w > g_z_buffer[(app.window_w * i32(y)) + i32(x)] {
         index := ((g_texture_width * tex_y) + tex_x)
         // if int(index) >= len(texture) { return }
         draw_pixel(x, y, texture[index])
