@@ -13,6 +13,8 @@ pr :: fmt.println
 FPS :: 60
 FRAME_TARGET_TIME :: 1000 / FPS
 
+MAX_TRIANGLES  :: 20000
+
 App_State :: struct {
 	window: ^sdl.Window,
 	renderer: ^sdl.Renderer,
@@ -59,6 +61,8 @@ g_z_buffer: []f32
 g_camera: Camera
 
 g_dt: f32
+
+g_frustrum_planes: [Frustrum_Plane]Plane
 
 main :: proc() {
     context.logger = log.create_console_logger()
@@ -134,18 +138,18 @@ process_input :: proc() {
             case sdl.K_X:
                 g_cull_method = .None
             case sdl.K_UP:
-                g_camera.position.y += 5 * g_dt
+                g_camera.position.y += 2 * g_dt
             case sdl.K_DOWN:
-                g_camera.position.y -= 5 * g_dt
+                g_camera.position.y -= 2 * g_dt
             case sdl.K_A:
                 g_camera.yaw += 0.3 * g_dt
             case sdl.K_D:
                 g_camera.yaw -= 0.3 * g_dt
             case sdl.K_W:
-                g_camera.forward_velocity = g_camera.direction * (10 * g_dt)
+                g_camera.forward_velocity = g_camera.direction * (7 * g_dt)
                 g_camera.position += g_camera.forward_velocity
             case sdl.K_S:
-                g_camera.forward_velocity = g_camera.direction * (10 * g_dt)
+                g_camera.forward_velocity = g_camera.direction * (7 * g_dt)
                 g_camera.position -= g_camera.forward_velocity
             }
         }
@@ -161,7 +165,7 @@ update :: proc() {
     g_dt = f32(sdl.GetTicks() - g_previous_frame_time) / 1000
     g_previous_frame_time = sdl.GetTicks()
 
-    g_mesh.rotation.x += 0.02 * g_dt
+    // g_mesh.rotation.x += 0.02 * g_dt
     // g_mesh.rotation.y += -0.02
     // g_mesh.rotation.z += 0.05
     // g_mesh.scale.x += 0.02
@@ -239,41 +243,63 @@ update :: proc() {
             }
         }
 
-        // Projections
-        projected_points: [3]Vec4
-        for transformed_vertex, i in transformed_vertices {
-            // projected_vertex := project(vec3_from_vec4(transformed_vertex))
-            projected_vertex := mat4_mul_vec4_project(g_proj_matrix, transformed_vertex)
+        // Clipping
+        polygon := create_polygon_from_triangle(
+            vec3_from_vec4(transformed_vertices[0]), 
+            vec3_from_vec4(transformed_vertices[1]),
+            vec3_from_vec4(transformed_vertices[2]),
+        )
+        clip_polygon(&polygon)
+        if i == 4 {
+            pr("polygon.num_vertices, i == 4", polygon.num_vertices)
 
-            // Scale into the view
-            projected_vertex.x *= f32(app.window_w) / 2
-            projected_vertex.y *= f32(app.window_h) / 2
-
-            // Invert y values to account for flipped screen y-coordinates (screen space vs obj file space)
-            projected_vertex.y *= -1
-
-            // Translate to middle of screen
-            projected_vertex.x += f32(app.window_w) / 2
-            projected_vertex.y += f32(app.window_h) / 2
-
-            projected_points[i] = projected_vertex
         }
+        triangles_after_clipping, num_triangles_after_clipping := triangles_from_polygon(polygon)
+        // if i == 4 {
+        //     pr("num_tri after clip, i==0",num_triangles_after_clipping)
+        // }
 
-        // Apply lighting
-        light_intensity_factor := -dot(normal, g_light.direction)
-        // pr(light_intensity_factor)
-        triangle_color := light_apply_intensity(face.color, light_intensity_factor)
+        for t := 0; t < num_triangles_after_clipping; t += 1 {
+            triangle_after_clipping := triangles_after_clipping[t]
 
-        projected_triangle := Triangle{
-            points = projected_points,
-            color = triangle_color,
-            texcoords = {
-                {face.a_uv.u, face.a_uv.v},
-                {face.b_uv.u, face.b_uv.v},
-                {face.c_uv.u, face.c_uv.v},
+            // Projections
+            projected_points: [3]Vec4
+            for transformed_vertex, i in triangle_after_clipping.points {
+                // projected_vertex := project(vec3_from_vec4(transformed_vertex))
+                projected_vertex := mat4_mul_vec4_project(g_proj_matrix, transformed_vertex)
+
+                // Scale into the view
+                projected_vertex.x *= f32(app.window_w) / 2
+                projected_vertex.y *= f32(app.window_h) / 2
+
+                // Invert y values to account for flipped screen y-coordinates (screen space vs obj file space)
+                projected_vertex.y *= -1
+
+                // Translate to middle of screen
+                projected_vertex.x += f32(app.window_w) / 2
+                projected_vertex.y += f32(app.window_h) / 2
+
+                projected_points[i] = projected_vertex
+            }
+
+            // Apply lighting
+            light_intensity_factor := -dot(normal, g_light.direction)
+            // pr(light_intensity_factor)
+            triangle_color := light_apply_intensity(face.color, light_intensity_factor)
+
+            triangle_to_render := Triangle{
+                points = projected_points,
+                color = triangle_color,
+                texcoords = {
+                    {face.a_uv.u, face.a_uv.v},
+                    {face.b_uv.u, face.b_uv.v},
+                    {face.c_uv.u, face.c_uv.v},
+                }
+            }
+            if len(g_triangles_to_render) < MAX_TRIANGLES {
+                append(&g_triangles_to_render, triangle_to_render)
             }
         }
-        append(&g_triangles_to_render, projected_triangle)
     }
 }
 
@@ -335,9 +361,14 @@ setup :: proc() {
     )
     fov := f32(math.PI) / 3
     aspect := f32(app.window_h) / f32(app.window_w)
-    znear: f32 = 0.1
-    zfar: f32 = 100
-    g_proj_matrix = mat4_make_perspective(fov, aspect, znear, zfar)
+    z_near: f32 = 0.1
+    z_far: f32 = 100
+    g_proj_matrix = mat4_make_perspective(fov, aspect, z_near, z_far)
+
+    // Initialize frustrum plans
+    init_frustrum_planes(fov, z_near, z_far)
+
+
     g_mesh = init_mesh()
     g_cull_method = .Backface
     g_light = {
@@ -356,8 +387,8 @@ setup :: proc() {
     // g_texture_height = 64
 
     // load_cube_mesh_data()
-    load_obj_file_data("./assets/f117.obj")
-    load_png_texture_data("./assets/f117.png")
+    load_obj_file_data("./assets/cube.obj")
+    load_png_texture_data("./assets/cube.png")
     log.info("Setup complete")
 }
 
