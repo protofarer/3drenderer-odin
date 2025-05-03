@@ -56,6 +56,8 @@ g_cull_method: Cull_Method
 
 g_z_buffer: []f32
 
+g_camera: Camera
+
 main :: proc() {
     context.logger = log.create_console_logger()
     app = new(App_State)
@@ -142,20 +144,29 @@ update :: proc() {
     }
     g_previous_frame_time = sdl.GetTicks()
 
-    g_mesh.rotation.x += 0.02
+    // g_mesh.rotation.x += 0.02
     // g_mesh.rotation.y += -0.02
     // g_mesh.rotation.z += 0.05
 
     // g_mesh.scale.x += 0.02
     // g_mesh.scale.y += 0.02
     // g_mesh.translation.x += 0.1
-    g_mesh.translation.z = 5
+    g_mesh.translation.z = 4
+
+    // animate camera
+    g_camera.position.x += 0.05
+    g_camera.position.y += 0.05
 
     scale_matrix := mat4_make_scale(g_mesh.scale)
     rotation_matrix_x := mat4_make_rotation_x(g_mesh.rotation.x)
     rotation_matrix_y := mat4_make_rotation_y(g_mesh.rotation.y)
     rotation_matrix_z := mat4_make_rotation_z(g_mesh.rotation.z)
     translation_matrix := mat4_make_translation(g_mesh.translation)
+
+    // View matrix
+    target := Vec3{0,0,4} // placeholder
+    up_direction := Vec3{0,1,0}
+    view_matrix := mat4_look_at(g_camera.position, target, up_direction)
 
     world_matrix := mat4_identity()
     // Order matters: scale -> rotate -> translate
@@ -174,8 +185,13 @@ update :: proc() {
 
         // Transformations
         transformed_vertices: [3]Vec4
-        for vertex, i in face_vertices {
-            transformed_vertices[i] = mat4_mul_vec4(world_matrix, vec4_from_vec3(vertex))
+        for vertex, j in face_vertices {
+            // World Space
+            transformed_vertex := vec4_from_vec3(vertex)
+            transformed_vertex = mat4_mul_vec4(world_matrix, transformed_vertex)
+            // Camera Space
+            transformed_vertex = mat4_mul_vec4(view_matrix, transformed_vertex)
+            transformed_vertices[j] = transformed_vertex 
         }
 
         // Backface Culling
@@ -191,9 +207,10 @@ update :: proc() {
         normalize(&normal)
 
         // form camera ray with A, points towards camera
-        camera_ray := g_camera_position - vertex_a
+        origin: Vec3
+        camera_ray := origin - vertex_a
 
-        dot_normal_camera := vec3_dot(normal, camera_ray)
+        dot_normal_camera := dot(normal, camera_ray)
 
         if g_cull_method == .Backface {
             // cull if negative (pointing away)
@@ -223,7 +240,7 @@ update :: proc() {
         }
 
         // Apply lighting
-        light_intensity_factor := -vec3_dot(normal, g_light.direction)
+        light_intensity_factor := -dot(normal, g_light.direction)
         // pr(light_intensity_factor)
         triangle_color := light_apply_intensity(face.color, light_intensity_factor)
 
@@ -308,6 +325,10 @@ setup :: proc() {
     }
 
     g_z_buffer = make([]f32, app.window_h * app.window_w)
+    g_camera = { 
+        position = {},
+        direction = {0,0,1},
+    }
 
     // Manually load hardcoded brick texture
     // g_texture = mem.slice_data_cast([]u32, redbrick_texture[:])

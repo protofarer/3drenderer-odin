@@ -76,6 +76,10 @@ vec3_cross :: proc(a: Vec3, b: Vec3) -> Vec3 {
     }
 }
 
+dot :: proc {
+    vec3_dot,
+}
+
 vec3_dot :: proc(a: Vec3, b: Vec3) -> f32 {
     return (a.x * b.x) + (a.y * b.y) + (a.z * b.z)
 }
