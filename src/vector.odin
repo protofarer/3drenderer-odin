@@ -16,8 +16,6 @@ normalize_vec2 :: proc(v: ^Vec2) {
     if l == 0 do return
     v.x /= l
     v.y /= l
-    // TODO: verify this
-    // v^ /= l
 }
 
 normalize_vec3 :: proc(v: ^Vec3) {
@@ -26,8 +24,6 @@ normalize_vec3 :: proc(v: ^Vec3) {
     v.x /= l
     v.y /= l
     v.z /= l
-    // TODO: verify this
-    // v^ /= l
 }
 
 length :: proc {
@@ -113,5 +109,5 @@ vec4_from_vec3 :: proc(v: Vec3) -> Vec4 {
 }
 
 vec3_from_vec4 :: proc(v: Vec4) -> Vec3 {
-    return {v.x, v.y, v.z}
+    return v.xyz
 }
