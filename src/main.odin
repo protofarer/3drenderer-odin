@@ -58,6 +58,8 @@ g_z_buffer: []f32
 
 g_camera: Camera
 
+g_dt: f32
+
 main :: proc() {
     context.logger = log.create_console_logger()
     app = new(App_State)
@@ -142,9 +144,10 @@ update :: proc() {
     if time_to_wait > 0 && time_to_wait <= FRAME_TARGET_TIME {
         sdl.Delay(u32(time_to_wait))
     }
+    g_dt = f32(sdl.GetTicks() - g_previous_frame_time) / 1000
     g_previous_frame_time = sdl.GetTicks()
 
-    // g_mesh.rotation.x += 0.02
+    g_mesh.rotation.x += 0.02 * g_dt
     // g_mesh.rotation.y += -0.02
     // g_mesh.rotation.z += 0.05
 
