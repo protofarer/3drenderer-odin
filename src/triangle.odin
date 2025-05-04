@@ -142,7 +142,7 @@ fill_flat_top_triangle :: proc(x0, y0, x1, y1, x2, y2: f32, color: Color_Value =
 
 // Draw textured pixel at position x,y using interpolation
 // TODO: change sig to use a_uv, b_uv..
-draw_texel :: proc(
+draw_triangle_texel :: proc(
     x: f32, y: f32,
     texture: []u32,
     point_a: Vec4, point_b: Vec4, point_c: Vec4,
@@ -180,10 +180,13 @@ draw_texel :: proc(
     // (hack) Adjust 1/w so that closer pixels have smaller values
    // interpolated_reciprocal_w = 1 - interpolated_reciprocal_w
 
-
-   if interpolated_reciprocal_w > g_z_buffer[(app.window_w * i32(y)) + i32(x)] {
+    buffer_index := app.window_w * i32(y) + i32(x)
+    // TODO: rm hack?
+    if int(buffer_index) >= len(g_z_buffer) { return }
+    if interpolated_reciprocal_w > g_z_buffer[buffer_index] {
         index := ((g_texture_width * tex_y) + tex_x)
-        // if int(index) >= len(texture) { return }
+        // TODO: rm hack?
+        if int(index) >= len(texture) { return }
         draw_pixel(x, y, texture[index])
         g_z_buffer[(app.window_w * i32(y)) + i32(x)] = interpolated_reciprocal_w
     }
@@ -242,7 +245,7 @@ draw_textured_triangle :: proc(triangle: Triangle, texture: []u32) {
 
             for x := x_start; x <= x_end; x += 1 {
                 // draw_pixel(x, y, 0xFFFF00FF)
-                draw_texel(x, y, texture, point_a, point_b, point_c, t[0], t[1], t[2])
+                draw_triangle_texel(x, y, texture, point_a, point_b, point_c, t[0], t[1], t[2])
             }
         }
     }
@@ -263,7 +266,7 @@ draw_textured_triangle :: proc(triangle: Triangle, texture: []u32) {
             if x_end < x_start do swap(&x_start, &x_end)
 
             for x := x_start; x <= x_end; x += 1 {
-                draw_texel(x, y, texture, point_a, point_b, point_c, t[0], t[1], t[2])
+                draw_triangle_texel(x, y, texture, point_a, point_b, point_c, t[0], t[1], t[2])
                 // draw_pixel(x, y, 0xFFFF00FF)
             }
         }

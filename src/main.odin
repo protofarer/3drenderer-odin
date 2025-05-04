@@ -142,9 +142,9 @@ process_input :: proc() {
             case sdl.K_DOWN:
                 g_camera.position.y -= 2 * g_dt
             case sdl.K_A:
-                g_camera.yaw += 0.3 * g_dt
-            case sdl.K_D:
                 g_camera.yaw -= 0.3 * g_dt
+            case sdl.K_D:
+                g_camera.yaw += 0.3 * g_dt
             case sdl.K_W:
                 g_camera.forward_velocity = g_camera.direction * (7 * g_dt)
                 g_camera.position += g_camera.forward_velocity
@@ -248,16 +248,10 @@ update :: proc() {
             vec3_from_vec4(transformed_vertices[0]), 
             vec3_from_vec4(transformed_vertices[1]),
             vec3_from_vec4(transformed_vertices[2]),
+            face.a_uv, face.b_uv, face.c_uv,
         )
         clip_polygon(&polygon)
-        if i == 4 {
-            pr("polygon.num_vertices, i == 4", polygon.num_vertices)
-
-        }
         triangles_after_clipping, num_triangles_after_clipping := triangles_from_polygon(polygon)
-        // if i == 4 {
-        //     pr("num_tri after clip, i==0",num_triangles_after_clipping)
-        // }
 
         for t := 0; t < num_triangles_after_clipping; t += 1 {
             triangle_after_clipping := triangles_after_clipping[t]
@@ -291,9 +285,9 @@ update :: proc() {
                 points = projected_points,
                 color = triangle_color,
                 texcoords = {
-                    {face.a_uv.u, face.a_uv.v},
-                    {face.b_uv.u, face.b_uv.v},
-                    {face.c_uv.u, face.c_uv.v},
+                    {triangle_after_clipping.texcoords[0].u, triangle_after_clipping.texcoords[0].v},
+                    {triangle_after_clipping.texcoords[1].u, triangle_after_clipping.texcoords[1].v},
+                    {triangle_after_clipping.texcoords[2].u, triangle_after_clipping.texcoords[2].v},
                 }
             }
             if len(g_triangles_to_render) < MAX_TRIANGLES {
@@ -304,6 +298,8 @@ update :: proc() {
 }
 
 render :: proc() {
+    clear_color_buffer(0xFF000000)
+    clear_z_buffer()
     draw_grid()
     for triangle in g_triangles_to_render {
         if g_render_mode == .Wireframe_And_Vertices {
@@ -330,8 +326,6 @@ render :: proc() {
         }
     }
     render_color_buffer()
-    clear_color_buffer(0xFF000000)
-    clear_z_buffer()
     sdl.RenderPresent(app.renderer)
 }
 
@@ -359,14 +353,17 @@ setup :: proc() {
         app.window_w,
         app.window_h,
     )
-    fov := f32(math.PI) / 3
+    aspect_x := f32(app.window_w) / f32(app.window_h)
+    aspect_y := f32(app.window_h) / f32(app.window_w)
+    fov_y := f32(math.PI) / 3
+    fov_x := math.atan(math.tan(fov_y / 2) * aspect_x) * 2
     aspect := f32(app.window_h) / f32(app.window_w)
     z_near: f32 = 0.1
     z_far: f32 = 100
-    g_proj_matrix = mat4_make_perspective(fov, aspect, z_near, z_far)
+    g_proj_matrix = mat4_make_perspective(fov_y, aspect_y, z_near, z_far)
 
     // Initialize frustrum plans
-    init_frustrum_planes(fov, z_near, z_far)
+    init_frustrum_planes(fov_x, fov_y, z_near, z_far)
 
 
     g_mesh = init_mesh()
@@ -387,8 +384,8 @@ setup :: proc() {
     // g_texture_height = 64
 
     // load_cube_mesh_data()
-    load_obj_file_data("./assets/cube.obj")
-    load_png_texture_data("./assets/cube.png")
+    load_obj_file_data("./assets/f117.obj")
+    load_png_texture_data("./assets/f117.png")
     log.info("Setup complete")
 }
 
