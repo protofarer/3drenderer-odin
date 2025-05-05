@@ -6,14 +6,16 @@ import "core:log"
 import "core:strconv"
 import "core:strings"
 
-// TODO: optimizations: face, vertex, etc.. de-duplication
-
 Mesh :: struct {
     vertices: [dynamic]Vec3,
     faces: [dynamic]Face,
     scale: Vec3,
     rotation: Vec3,
     translation: Vec3,
+}
+
+init_mesh :: proc() {
+    g_mesh = Mesh{scale = {1,1,1}}
 }
 
 // Handles triangles only
@@ -73,8 +75,4 @@ load_obj_file_data :: proc(filename: string) {
     }
     g_mesh.vertices = vertices
     g_mesh.faces = faces
-}
-
-init_mesh :: proc() -> Mesh {
-    return Mesh{scale = {1,1,1}}
 }

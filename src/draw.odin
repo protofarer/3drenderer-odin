@@ -12,7 +12,6 @@ draw_grid :: proc() {
             draw_pixel(x * d, y * d, 0xFF006600)
         }
     }
-
 }
 
 draw_rect_filled :: proc {
@@ -42,19 +41,17 @@ draw_pixel :: proc {
 }
 
 draw_pixel_i32 :: proc(x: i32, y: i32, color: Color_Value = DEFAULT_COLOR) {
-    condition := x >= 0 && x < app.window_w && y >= 0 && y < app.window_h
-    // if !condition do return
-    // assert(condition, "Pixel must be within window bounds")
-    if !condition do return
-    g_color_buffer[(app.window_w * y) + x] = color
+    condition := x < 0 || x >= app.window_w || y < 0 || y >= app.window_h
+    if !condition {
+        g_color_buffer[(app.window_w * y) + x] = color
+    }
 }
 
 draw_pixel_f32 :: proc(x: f32, y: f32, color: Color_Value = DEFAULT_COLOR) {
-    condition := x >= 0 && x < f32(app.window_w) && y >= 0 && y < f32(app.window_h)
-    // if !condition do return
-    // assert(condition, "Pixel must be within window bounds")
-    if !condition do return
-    g_color_buffer[(app.window_w * i32(y)) + i32(x)] = color
+    condition := x < 0 || x >= f32(app.window_w) || y < 0 || y >= f32(app.window_h)
+    if !condition {
+        g_color_buffer[(app.window_w * i32(y)) + i32(x)] = color
+    }
 }
 
 draw_line :: proc {
@@ -77,11 +74,7 @@ draw_line_i32 :: proc(x0, y0, x1, y1: i32, color: Color_Value = DEFAULT_COLOR) {
     curr_y : f32 = f32(y0)
 
     for i in 0..<side_length {
-        draw_pixel(
-            math.round(curr_x), 
-            math.round(curr_y),
-            color,
-        )
+        draw_pixel(math.round(curr_x), math.round(curr_y), color)
         curr_x += inc_x
         curr_y += inc_y
     }
@@ -102,11 +95,7 @@ draw_line_f32 :: proc(x0, y0, x1, y1: f32, color: Color_Value = DEFAULT_COLOR) {
     curr_y := y0
 
     for i in 0..<side_length {
-        draw_pixel(
-            math.round(curr_x), 
-            math.round(curr_y),
-            color,
-        )
+        draw_pixel(math.round(curr_x), math.round(curr_y), color)
         curr_x += inc_x
         curr_y += inc_y
     }

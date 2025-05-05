@@ -96,7 +96,6 @@ initialize_window :: proc() -> bool {
     display_mode := sdl.GetCurrentDisplayMode(2)
     app.window_w = display_mode.w
     app.window_h = display_mode.h
-	// RESIZABLE
     if app.window = sdl.CreateWindow("3D Software Renderer", app.window_w, app.window_h, {.BORDERLESS}); app.window == nil {
         log.errorf("CreateWindow error: %v", sdl.GetError())
         return false
@@ -108,6 +107,10 @@ initialize_window :: proc() -> bool {
         log.errorf("CreateRenderer error: %v", sdl.GetError())
         return false
     }
+
+    g_color_buffer = make([]u32, app.window_w * app.window_h)
+    g_z_buffer = make([]f32, app.window_h * app.window_w)
+
     return true
 }
 
@@ -165,7 +168,7 @@ update :: proc() {
     g_dt = f32(sdl.GetTicks() - g_previous_frame_time) / 1000
     g_previous_frame_time = sdl.GetTicks()
 
-    // g_mesh.rotation.x += 0.02 * g_dt
+    g_mesh.rotation.x += 1 * g_dt
     // g_mesh.rotation.y += -0.02
     // g_mesh.rotation.z += 0.05
     // g_mesh.scale.x += 0.02
@@ -278,7 +281,6 @@ update :: proc() {
 
             // Apply lighting
             light_intensity_factor := -dot(normal, g_light.direction)
-            // pr(light_intensity_factor)
             triangle_color := light_apply_intensity(face.color, light_intensity_factor)
 
             triangle_to_render := Triangle{
@@ -307,8 +309,7 @@ render :: proc() {
                 draw_rect_filled(point.x - 3, point.y - 3, 6, 6, 0xFFFF0000)
             }
         }
-
-        if g_render_mode == .Wireframe_And_Vertices || g_render_mode == .Wireframe || g_render_mode == .Filled_Triangles_And_Wireframe || g_render_mode == .Textured_And_Wireframe {
+        if is_rendering_wireframe() {
             draw_triangle(
                 triangle.points[0].x, triangle.points[0].y,
                 triangle.points[1].x, triangle.points[1].y,
@@ -316,17 +317,31 @@ render :: proc() {
                 0xFF00FF00
             )
         }
-
-        if g_render_mode == .Textured || g_render_mode == .Textured_And_Wireframe {
+        if is_rendering_textures() {
             draw_textured_triangle(triangle, g_texture)
         }
-
-        if g_render_mode == .Filled_Triangles || g_render_mode == .Filled_Triangles_And_Wireframe {
+        if is_rendering_filled() {
             draw_filled_triangle(triangle)
         }
     }
     render_color_buffer()
-    sdl.RenderPresent(app.renderer)
+}
+
+is_rendering_filled :: proc() -> bool {
+    return g_render_mode == .Filled_Triangles || 
+           g_render_mode == .Filled_Triangles_And_Wireframe 
+}
+
+is_rendering_wireframe :: proc() -> bool {
+    return  g_render_mode == .Wireframe_And_Vertices || 
+            g_render_mode == .Wireframe || 
+            g_render_mode == .Filled_Triangles_And_Wireframe || 
+            g_render_mode == .Textured_And_Wireframe
+}
+
+is_rendering_textures :: proc() -> bool {
+    return g_render_mode == .Textured || 
+           g_render_mode == .Textured_And_Wireframe 
 }
 
 shutdown :: proc() {
@@ -344,8 +359,6 @@ shutdown :: proc() {
 setup :: proc() {
     log.info("Begin setup...")
     // allocate and slice
-    color_buffer := make([]u32, app.window_w * app.window_h)
-    g_color_buffer = color_buffer
     g_color_buffer_texture = sdl.CreateTexture(
         app.renderer, 
         sdl.PixelFormat.ABGR8888, // PNG RGBA internally, on little-endian (AMD) bytes reversed
@@ -365,18 +378,10 @@ setup :: proc() {
     // Initialize frustrum plans
     init_frustrum_planes(fov_x, fov_y, z_near, z_far)
 
-
-    g_mesh = init_mesh()
+    init_mesh()
+    init_camera()
+    init_light()
     g_cull_method = .Backface
-    g_light = {
-        direction = {0, 0, 1}
-    }
-
-    g_z_buffer = make([]f32, app.window_h * app.window_w)
-    g_camera = { 
-        position = {},
-        direction = {0,0,1},
-    }
 
     // Manually load hardcoded brick texture
     // g_texture = mem.slice_data_cast([]u32, redbrick_texture[:])
@@ -390,16 +395,15 @@ setup :: proc() {
 }
 
 clear_color_buffer :: proc(color: u32) {
-    for y in 0..<app.window_h {
-        for x in 0..<app.window_w {
-            draw_pixel(x, y, color)
-        }
+    for i in 0..<app.window_h*app.window_w {
+        draw_pixel(i % app.window_w, i/app.window_w, color)
     }
 }
 
 render_color_buffer :: proc() {
     sdl.UpdateTexture(g_color_buffer_texture, nil, raw_data(g_color_buffer), app.window_w * 4)
     sdl.RenderTexture(app.renderer, g_color_buffer_texture, nil, nil)
+    sdl.RenderPresent(app.renderer)
 }
 
 clear_z_buffer :: proc() {

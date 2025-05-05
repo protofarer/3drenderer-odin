@@ -5,6 +5,12 @@ Light :: struct {
     direction: Vec3,
 }
 
+init_light :: proc() {
+    g_light = {
+        direction = {0, 0, 1}
+    }
+}
+
 light_apply_intensity :: proc(original_color: Color_Value, pct: f32) -> Color_Value {
     pct := pct
     if pct < 0 do pct = 0

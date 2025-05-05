@@ -7,6 +7,13 @@ Camera :: struct {
     yaw: f32,
 }
 
+init_camera :: proc() {
+    g_camera = { 
+        position = {},
+        direction = {0,0,1},
+    }
+}
+
 mat4_look_at :: proc(eye: Vec3, target: Vec3, up: Vec3) -> Mat4 {
     z := target - eye
     normalize(&z)

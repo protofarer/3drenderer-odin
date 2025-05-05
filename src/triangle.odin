@@ -16,9 +16,8 @@ Face :: struct {
 Triangle :: struct {
     points: [3]Vec4,
     color: Color_Value,
-    texcoords: Tex_Coords
+    texcoords: [3]Tex2
 }
-Tex_Coords :: [3]Tex2
 
 draw_triangle :: proc(x0,y0,x1,y1,x2,y2: f32, color: Color_Value = DEFAULT_COLOR) {
     draw_line(x0, y0, x1, y1, color)
@@ -108,9 +107,12 @@ draw_triangle_pixel :: proc(x, y: f32, triangle: Triangle) {
     // diverge from course, since now z_buffer cleared to 0 instead of 1
     // interpolated_reciprocal_w = 1 - interpolated_reciprocal_w
 
-    if interpolated_reciprocal_w > g_z_buffer[(app.window_w * i32(y)) + i32(x)] {
+    buffer_index := app.window_w * i32(y) + i32(x)
+    // TODO: rm hack?
+    if int(buffer_index) >= len(g_z_buffer) { return }
+    if interpolated_reciprocal_w > g_z_buffer[buffer_index] {
         draw_pixel(x, y, triangle.color)
-        g_z_buffer[(app.window_w * i32(y)) + i32(x)] = interpolated_reciprocal_w
+        g_z_buffer[buffer_index] = interpolated_reciprocal_w
     }
 }
 
@@ -141,7 +143,6 @@ fill_flat_top_triangle :: proc(x0, y0, x1, y1, x2, y2: f32, color: Color_Value =
 }
 
 // Draw textured pixel at position x,y using interpolation
-// TODO: change sig to use a_uv, b_uv..
 draw_triangle_texel :: proc(
     x: f32, y: f32,
     texture: []u32,
@@ -181,14 +182,14 @@ draw_triangle_texel :: proc(
    // interpolated_reciprocal_w = 1 - interpolated_reciprocal_w
 
     buffer_index := app.window_w * i32(y) + i32(x)
-    // TODO: rm hack?
+    // TODO: hack?
     if int(buffer_index) >= len(g_z_buffer) { return }
     if interpolated_reciprocal_w > g_z_buffer[buffer_index] {
         index := ((g_texture_width * tex_y) + tex_x)
-        // TODO: rm hack?
+        // TODO: hack?
         if int(index) >= len(texture) { return }
         draw_pixel(x, y, texture[index])
-        g_z_buffer[(app.window_w * i32(y)) + i32(x)] = interpolated_reciprocal_w
+        g_z_buffer[buffer_index] = interpolated_reciprocal_w
     }
 }
 
