@@ -387,12 +387,6 @@ setup :: proc() {
     init_light()
     g_cull_method = .Backface
 
-    // Manually load hardcoded brick texture
-    // g_texture = mem.slice_data_cast([]u32, redbrick_texture[:])
-    // g_texture_width = 64
-    // g_texture_height = 64
-
-    // load_cube_mesh_data()
     load_obj_file_data("./assets/f117.obj")
     load_png_texture_data("./assets/f117.png")
     log.info("Setup complete")
