@@ -16,7 +16,8 @@ Face :: struct {
 Triangle :: struct {
     points: [3]Vec4,
     color: Color_Value,
-    texcoords: [3]Tex2
+    texcoords: [3]Tex2,
+    // TODO: point to a texture.. unsure, seems wasteful versus accessing directly through global meshes
 }
 
 draw_triangle :: proc(x0,y0,x1,y1,x2,y2: f32, color: Color_Value = DEFAULT_COLOR) {
@@ -145,7 +146,7 @@ fill_flat_top_triangle :: proc(x0, y0, x1, y1, x2, y2: f32, color: Color_Value =
 // Draw textured pixel at position x,y using interpolation
 draw_triangle_texel :: proc(
     x: f32, y: f32,
-    texture: []u32,
+    texture: Texture,
     point_a: Vec4, point_b: Vec4, point_c: Vec4,
     a_uv: Tex2, b_uv: Tex2, c_uv: Tex2,
 ) {
@@ -175,8 +176,8 @@ draw_triangle_texel :: proc(
 
     // Map u,v, to full texture width and height
     // hacky to keep resulting index within bounds. This is a hack because of negative (invalid) weights
-    tex_x := math.abs(i32(interpolated_u * f32(g_texture_width))) % g_texture_width
-    tex_y := math.abs(i32(interpolated_v * f32(g_texture_height))) % g_texture_height
+    tex_x := math.abs(i32(interpolated_u * f32(texture.width))) % texture.width
+    tex_y := math.abs(i32(interpolated_v * f32(texture.height))) % texture.height
 
     // (hack) Adjust 1/w so that closer pixels have smaller values
    // interpolated_reciprocal_w = 1 - interpolated_reciprocal_w
@@ -185,15 +186,15 @@ draw_triangle_texel :: proc(
     // TODO: hack?
     if int(buffer_index) >= len(g_z_buffer) { return }
     if interpolated_reciprocal_w > g_z_buffer[buffer_index] {
-        index := ((g_texture_width * tex_y) + tex_x)
+        index := ((texture.width * tex_y) + tex_x)
         // TODO: hack?
-        if int(index) >= len(texture) { return }
-        draw_pixel(x, y, texture[index])
+        if index >= texture.size { return }
+        draw_pixel(x, y, texture.pixels[index])
         g_z_buffer[buffer_index] = interpolated_reciprocal_w
     }
 }
 
-draw_textured_triangle :: proc(triangle: Triangle, texture: []u32) {
+draw_textured_triangle :: proc(triangle: Triangle, texture: Texture) {
     p := triangle.points
     t := triangle.texcoords
     if p[0].y > p[1].y {
@@ -290,4 +291,18 @@ barycentric_weights :: proc(a: Vec2, b: Vec2, c: Vec2, p: Vec2) -> Vec3 {
     beta := area_parallelogram_pca / area_parallelogram_abc
     gamma := 1 - alpha - beta
     return {alpha, beta, gamma}
+}
+
+get_triangle_normal :: proc(transformed_vertices: [3]Vec4) -> Vec3 {
+    vertex_a := vec3_from_vec4(transformed_vertices[0])
+    vertex_b := vec3_from_vec4(transformed_vertices[1])
+    vertex_c := vec3_from_vec4(transformed_vertices[2])
+    vector_ab := vertex_b - vertex_a
+    vector_ac := vertex_c - vertex_a
+    normalize(&vector_ab) // WARN extra instructions, possibly rm if not used later
+    normalize(&vector_ac) // WARN extra instructions, possibly rm if not used later
+
+    normal := cross(vector_ab, vector_ac) // coordinate handedness dependent
+    normalize(&normal)
+    return normal
 }

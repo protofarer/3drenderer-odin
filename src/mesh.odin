@@ -5,25 +5,47 @@ import "core:text/scanner"
 import "core:log"
 import "core:strconv"
 import "core:strings"
+import "core:image"
 
 Mesh :: struct {
     vertices: [dynamic]Vec3,
     faces: [dynamic]Face,
+    texture: Texture,
     scale: Vec3,
     rotation: Vec3,
     translation: Vec3,
 }
 
-init_mesh :: proc() {
-    g_mesh = Mesh{scale = {1,1,1}}
+Mesh_Initialization_Params :: struct {
+    obj_file: string,
+    tex_file: Maybe(string),
+    scale: Vec3,
+    translation: Vec3,
+    rotation: Vec3,
+}
+
+init_mesh :: proc(filepath: string, scale: Vec3, translation: Vec3, rotation: Vec3) -> (Mesh, bool) {
+    vertices, faces, ok_obj := load_obj_file_data(filepath)
+    if !ok_obj {
+        log.errorf("Failed to load object file:", filepath)
+        return {}, false
+    }
+    mesh := Mesh{
+        scale = scale,
+        translation = translation,
+        rotation = rotation,
+        vertices = vertices,
+        faces = faces,
+    }
+    return mesh, true
 }
 
 // Handles triangles only
-load_obj_file_data :: proc(filename: string) {
+load_obj_file_data :: proc(filename: string) -> (out_vertices: [dynamic]Vec3, out_faces: [dynamic]Face, ok: bool) {
     raw_data, read_ok := os.read_entire_file_from_filename(filename)
     if !read_ok {
         log.error("Error reading file:", filename)
-        return
+        return nil, nil, false
     }
     defer delete(raw_data)
 
@@ -33,7 +55,7 @@ load_obj_file_data :: proc(filename: string) {
     defer delete(tex_coords)
 
     string_data := string(raw_data)
-    lines, ok := strings.split(string_data, "\n")
+    lines, _ok := strings.split(string_data, "\n")
     for line in lines {
         if len(line) == 0 do continue
 
@@ -73,6 +95,5 @@ load_obj_file_data :: proc(filename: string) {
         case:
         }
     }
-    g_mesh.vertices = vertices
-    g_mesh.faces = faces
+    return vertices, faces, true
 }
