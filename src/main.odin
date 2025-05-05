@@ -140,20 +140,29 @@ process_input :: proc() {
                 g_cull_method = .Backface
             case sdl.K_X:
                 g_cull_method = .None
-            case sdl.K_UP:
-                g_camera.position.y += 2 * g_dt
-            case sdl.K_DOWN:
-                g_camera.position.y -= 2 * g_dt
+            case sdl.K_R:
+                update_camera_position({g_camera.position.x, g_camera.position.y + 2 * g_dt, g_camera.position.z})
+            case sdl.K_F:
+                update_camera_position({g_camera.position.x, g_camera.position.y - 2 * g_dt, g_camera.position.z})
             case sdl.K_A:
-                g_camera.yaw -= 0.3 * g_dt
+                rotate_camera_yaw(-0.3 * g_dt)
+                // TODO: calc new direction
             case sdl.K_D:
-                g_camera.yaw += 0.3 * g_dt
+                rotate_camera_yaw(0.3 * g_dt)
             case sdl.K_W:
-                g_camera.forward_velocity = g_camera.direction * (7 * g_dt)
-                g_camera.position += g_camera.forward_velocity
+                rotate_camera_pitch(-0.3 * g_dt)
             case sdl.K_S:
-                g_camera.forward_velocity = g_camera.direction * (7 * g_dt)
-                g_camera.position -= g_camera.forward_velocity
+                rotate_camera_pitch(0.3 * g_dt)
+            case sdl.K_UP:
+                update_camera_forward_velocity(get_camera_direction() * 7)
+                update_camera_position(get_camera_position() + get_camera_forward_velocity() * g_dt)
+            case sdl.K_DOWN:
+                update_camera_forward_velocity(get_camera_direction() * -7)
+                update_camera_position(get_camera_position() + get_camera_forward_velocity() * g_dt)
+            case sdl.K_LEFT:
+                update_camera_position({g_camera.position.x - 2 * g_dt, g_camera.position.y, g_camera.position.z})
+            case sdl.K_RIGHT:
+                update_camera_position({g_camera.position.x + 2 * g_dt, g_camera.position.y, g_camera.position.z})
             }
         }
     }
@@ -182,17 +191,12 @@ update :: proc() {
     rotation_matrix_z := mat4_make_rotation_z(g_mesh.rotation.z)
     translation_matrix := mat4_make_translation(g_mesh.translation)
 
+    // update camera direction based on yaw, pitch, and unit target
+    update_camera_lookat_target()
+
     // View matrix
     up_direction := Vec3{0, 1, 0}
-
-    // Init target looking down z-axis
-    target := Vec3{0, 0, 1}
-    camera_yaw_rotation := mat4_make_rotation_y(g_camera.yaw)
-    g_camera.direction = vec3_from_vec4(mat4_mul_vec4(camera_yaw_rotation, vec4_from_vec3(target)))
-
-    // Offset camera position in direction ("ray", because magnitude is important) where camera is pointing at
-    target = g_camera.position + g_camera.direction
-
+    target := get_camera_target()
     view_matrix := mat4_look_at(g_camera.position, target, up_direction)
 
     world_matrix := mat4_identity()
