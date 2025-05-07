@@ -177,6 +177,14 @@ update :: proc() {
     g_dt = f32(sdl.GetTicks() - g_previous_frame_time) / 1000
     g_previous_frame_time = sdl.GetTicks()
 
+    // update camera direction based on yaw, pitch, and unit target
+    update_camera_lookat_target()
+
+    // View matrix
+    up_direction := Vec3{0, 1, 0}
+    target := get_camera_target()
+    view_matrix := mat4_look_at(g_camera.position, target, up_direction)
+
     for &mesh, mesh_idx in g_meshes {
         // g_mesh.rotation.x += 1 * g_dt
         // g_mesh.rotation.y += -0.02
@@ -184,116 +192,7 @@ update :: proc() {
         // g_mesh.scale.x += 0.02
         // g_mesh.scale.y += 0.02
         // g_mesh.translation.x += 0.1
-
-        scale_matrix := mat4_make_scale(mesh.scale)
-        rotation_matrix_x := mat4_make_rotation_x(mesh.rotation.x)
-        rotation_matrix_y := mat4_make_rotation_y(mesh.rotation.y)
-        rotation_matrix_z := mat4_make_rotation_z(mesh.rotation.z)
-        translation_matrix := mat4_make_translation(mesh.translation)
-
-        // update camera direction based on yaw, pitch, and unit target
-        update_camera_lookat_target()
-
-        // View matrix
-        up_direction := Vec3{0, 1, 0}
-        target := get_camera_target()
-        view_matrix := mat4_look_at(g_camera.position, target, up_direction)
-
-        world_matrix := mat4_identity()
-        // Order matters: scale -> rotate -> translate
-        world_matrix = mat4_mul_mat4(scale_matrix, world_matrix)
-        world_matrix = mat4_mul_mat4(rotation_matrix_z, world_matrix)
-        world_matrix = mat4_mul_mat4(rotation_matrix_y, world_matrix)
-        world_matrix = mat4_mul_mat4(rotation_matrix_x, world_matrix)
-        world_matrix = mat4_mul_mat4(translation_matrix, world_matrix)
-
-        triangles_to_render := make([dynamic]Triangle, context.temp_allocator)
-        for face, i in mesh.faces {
-            face_vertices: [3]Vec3
-            face_vertices[0] = mesh.vertices[face.a]
-            face_vertices[1] = mesh.vertices[face.b]
-            face_vertices[2] = mesh.vertices[face.c]
-
-            // Transformations
-            transformed_vertices: [3]Vec4
-            for vertex, j in face_vertices {
-                // World Space
-                transformed_vertex := vec4_from_vec3(vertex)
-                transformed_vertex = mat4_mul_vec4(world_matrix, transformed_vertex)
-                // Camera Space
-                transformed_vertex = mat4_mul_vec4(view_matrix, transformed_vertex)
-                transformed_vertices[j] = transformed_vertex 
-            }
-
-            // Backface Culling
-            face_normal := get_triangle_normal(transformed_vertices)
-
-            // form camera ray with A, points towards camera
-            origin: Vec3
-            vertex_a := vec3_from_vec4(transformed_vertices[0])
-            camera_ray := origin - vertex_a
-
-            dot_normal_camera := dot(face_normal, camera_ray)
-
-            if g_cull_method == .Backface {
-                // cull if negative (pointing away)
-                if dot_normal_camera < 0 {
-                    continue
-                }
-            }
-
-            // Clipping
-            polygon := create_polygon_from_triangle(
-                         vec3_from_vec4(transformed_vertices[0]), 
-                         vec3_from_vec4(transformed_vertices[1]),
-                         vec3_from_vec4(transformed_vertices[2]),
-                         face.a_uv, face.b_uv, face.c_uv,
-                     )
-            clip_polygon(&polygon)
-            triangles_after_clipping, num_triangles_after_clipping := triangles_from_polygon(polygon)
-
-            for t := 0; t < num_triangles_after_clipping; t += 1 {
-                triangle_after_clipping := triangles_after_clipping[t]
-
-                // Projections
-                projected_points: [3]Vec4
-                for transformed_vertex, i in triangle_after_clipping.points {
-                    // projected_vertex := project(vec3_from_vec4(transformed_vertex))
-                    projected_vertex := mat4_mul_vec4_project(g_proj_matrix, transformed_vertex)
-
-                    // Scale into the view
-                    projected_vertex.x *= f32(app.window_w) / 2
-                    projected_vertex.y *= f32(app.window_h) / 2
-
-                    // Invert y values to account for flipped screen y-coordinates (screen space vs obj file space)
-                    projected_vertex.y *= -1
-
-                    // Translate to middle of screen
-                    projected_vertex.x += f32(app.window_w) / 2
-                    projected_vertex.y += f32(app.window_h) / 2
-
-                    projected_points[i] = projected_vertex
-                }
-
-                // Apply lighting
-                light_intensity_factor := -dot(face_normal, g_light.direction)
-                triangle_color := light_apply_intensity(face.color, light_intensity_factor)
-
-                triangle_to_render := Triangle{
-                    points = projected_points,
-                    color = triangle_color,
-                    texcoords = {
-                        {triangle_after_clipping.texcoords[0].u, triangle_after_clipping.texcoords[0].v},
-                        {triangle_after_clipping.texcoords[1].u, triangle_after_clipping.texcoords[1].v},
-                        {triangle_after_clipping.texcoords[2].u, triangle_after_clipping.texcoords[2].v},
-                    }
-                }
-                if len(triangles_to_render) * mesh_idx < MAX_TRIANGLES {
-                    append(&triangles_to_render, triangle_to_render)
-                }
-            }
-        }
-        g_mesh_triangles_to_render[mesh_idx] = triangles_to_render
+        process_graphics_pipeline_stages(&mesh, mesh_idx, view_matrix)
     }
 }
 
@@ -382,25 +281,32 @@ setup :: proc() {
 
     inputs := [?]Mesh_Initialization_Params {
         {
-            obj_file = "assets/f117.obj",
-            tex_file = "assets/f117.png",
-            scale = {1,1,1},
-            translation = {0,0,10},
-            rotation = {0,0,0},
+            obj_file = "assets/runway.obj",
+            tex_file = "assets/runway.png",
+            scale = {1, 1, 1},
+            translation = {0, -1.5, 23},
+            rotation = {0, 0, 0},
         },
         {
-            obj_file = "assets/cube.obj",
-            tex_file = "assets/cube.png",
-            scale = {1,1,1},
-            translation = {5,0,10},
-            rotation = {0,0,0},
+            obj_file = "assets/f22.obj",
+            tex_file = "assets/f22.png",
+            scale = {1, 1, 1},
+            translation = {0, -1.3, 5},
+            rotation = {0, -math.PI / 2, 0},
         },
         {
             obj_file = "assets/efa.obj",
             tex_file = "assets/efa.png",
-            scale = {1,1,1},
-            translation = {-5,0,10},
-            rotation = {0,0,0},
+            scale = {1, 1, 1},
+            translation = {-2, -1.3, 9},
+            rotation = {0, -math.PI / 2, 0},
+        },
+        {
+            obj_file = "assets/f117.obj",
+            tex_file = "assets/f117.png",
+            scale = {1, 1, 1},
+            translation = {2, -1.3, 9},
+            rotation = {0, -math.PI / 2, 0},
         },
     }
 
@@ -418,6 +324,112 @@ setup :: proc() {
     }
     log.info("Loaded", g_meshes_count, "meshes")
     log.info("Setup complete")
+}
+
+process_graphics_pipeline_stages :: proc(mesh: ^Mesh, mesh_idx: int, view_matrix: Mat4) {
+    scale_matrix := mat4_make_scale(mesh.scale)
+    rotation_matrix_x := mat4_make_rotation_x(mesh.rotation.x)
+    rotation_matrix_y := mat4_make_rotation_y(mesh.rotation.y)
+    rotation_matrix_z := mat4_make_rotation_z(mesh.rotation.z)
+    translation_matrix := mat4_make_translation(mesh.translation)
+
+    // process_graphics_pipeline_stages(mesh)
+    world_matrix := mat4_identity()
+    // Order matters: scale -> rotate -> translate
+    world_matrix = mat4_mul_mat4(scale_matrix, world_matrix)
+    world_matrix = mat4_mul_mat4(rotation_matrix_z, world_matrix)
+    world_matrix = mat4_mul_mat4(rotation_matrix_y, world_matrix)
+    world_matrix = mat4_mul_mat4(rotation_matrix_x, world_matrix)
+    world_matrix = mat4_mul_mat4(translation_matrix, world_matrix)
+
+    triangles_to_render := make([dynamic]Triangle, context.temp_allocator)
+    for face, i in mesh.faces {
+        face_vertices: [3]Vec3
+        face_vertices[0] = mesh.vertices[face.a]
+        face_vertices[1] = mesh.vertices[face.b]
+        face_vertices[2] = mesh.vertices[face.c]
+
+        // Transformations
+        transformed_vertices: [3]Vec4
+        for vertex, j in face_vertices {
+            // World Space
+            transformed_vertex := vec4_from_vec3(vertex)
+            transformed_vertex = mat4_mul_vec4(world_matrix, transformed_vertex)
+            // Camera Space
+            transformed_vertex = mat4_mul_vec4(view_matrix, transformed_vertex)
+            transformed_vertices[j] = transformed_vertex 
+        }
+
+        // Backface Culling
+        face_normal := get_triangle_normal(transformed_vertices)
+
+
+        if g_cull_method == .Backface {
+            // form camera ray with A, points towards camera
+            origin: Vec3
+            camera_ray := origin - vec3_from_vec4(transformed_vertices[0])
+            dot_normal_camera := dot(face_normal, camera_ray)
+
+            // cull if negative (pointing away)
+            if dot_normal_camera < 0 {
+                continue
+            }
+        }
+
+        // Clipping
+        polygon := create_polygon_from_triangle(
+                     vec3_from_vec4(transformed_vertices[0]), 
+                     vec3_from_vec4(transformed_vertices[1]),
+                     vec3_from_vec4(transformed_vertices[2]),
+                     face.a_uv, face.b_uv, face.c_uv,
+                 )
+        clip_polygon(&polygon)
+        triangles_after_clipping, num_triangles_after_clipping := triangles_from_polygon(polygon)
+
+        for t := 0; t < num_triangles_after_clipping; t += 1 {
+            triangle_after_clipping := triangles_after_clipping[t]
+
+            // Projections
+            projected_points: [3]Vec4
+            for transformed_vertex, i in triangle_after_clipping.points {
+                // projected_vertex := project(vec3_from_vec4(transformed_vertex))
+                projected_vertex := mat4_mul_vec4_project(g_proj_matrix, transformed_vertex)
+
+                // Scale into the view
+                projected_vertex.x *= f32(app.window_w) / 2
+                projected_vertex.y *= f32(app.window_h) / 2
+
+                // Invert y values to account for flipped screen y-coordinates (screen space vs obj file space)
+                projected_vertex.y *= -1
+
+                // Translate to middle of screen
+                projected_vertex.x += f32(app.window_w) / 2
+                projected_vertex.y += f32(app.window_h) / 2
+
+                projected_points[i] = projected_vertex
+            }
+
+            // Apply lighting
+            light_intensity_factor := -dot(face_normal, g_light.direction)
+            triangle_color := light_apply_intensity(face.color, light_intensity_factor)
+
+            triangle_to_render := Triangle{
+                points = projected_points,
+                color = triangle_color,
+                texcoords = {
+                    {triangle_after_clipping.texcoords[0].u, triangle_after_clipping.texcoords[0].v},
+                    {triangle_after_clipping.texcoords[1].u, triangle_after_clipping.texcoords[1].v},
+                    {triangle_after_clipping.texcoords[2].u, triangle_after_clipping.texcoords[2].v},
+                }
+            }
+            if len(triangles_to_render) * (mesh_idx + 1) < MAX_TRIANGLES {
+                append(&triangles_to_render, triangle_to_render)
+            } else {
+                log.warn("Warning, mesh #",mesh_idx,"did not render, MAX_TRIANGLES would be exceeded")
+            }
+        }
+    }
+    g_mesh_triangles_to_render[mesh_idx] = triangles_to_render
 }
 
 load_texture :: proc(filepath: string) -> (Texture, bool) {
