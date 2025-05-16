@@ -23,11 +23,11 @@ Texture :: struct {
 
 load_png_texture_data :: proc(filename: string) -> (texture: Texture, ok: bool) {
     img, err := image.load_from_file(filename)
-    defer free(img)
     if err != nil {
         log.errorf("Trying to read image file %v returned %v\n", filename, err)
         return {}, false
     }
+    defer free(img)
     // pr("Image loaded:", img.width, "x", img.height, "channels:", img.channels)
 
     pixel_count := img.width * img.height
